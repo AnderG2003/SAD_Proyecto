@@ -27,7 +27,7 @@ from sklearn.model_selection import GridSearchCV
 if __name__ == '__main__':
 
     nombreDatos = sys.argv[1]
-    numTopicos = sys.argv[2]
+    numTopicos = int(sys.argv[2])
     sentimiento = sys.argv[3]   ## CONSULTAR CON SENTIMENTANALYSIS (0 = negativo, 1 = neutral, 2 = positivo)
 
     if numTopicos > 10:
@@ -59,15 +59,16 @@ if __name__ == '__main__':
     documentos = documentosAux
     
     # De cada lista quitamos las palabras que hemos considerado stopwords
-    new_docs = []
-    for doc in docs:
+    documentosAux3 = []
+    for docuAct in documentos:
         filtered_doc = []
-        for token in doc:
+        for token in docuAct:
             if token not in stopWords:
                 filtered_doc.append(token)
-        new_docs.append(filtered_doc)
+        documentosAux3.append(filtered_doc)
 
-    docs = new_docs
+    documentos = documentosAux3
+
     # De cada lista quitamos las palabras de longitud 1
     documentosAux2 = []
     for docuAct in documentos:
@@ -80,6 +81,53 @@ if __name__ == '__main__':
     documentos = documentosAux2
 
     # De cada lista quitamos las palabras que son solo números
+    documentosAux4 = []
+    for docuAct in documentos:
+        filtered_doc = []
+        for token in docuAct:
+            if not token.isnumeric():
+                filtered_doc.append(token)
+        documentosAux4.append(filtered_doc)
+
+    documentos = documentosAux4
 
 
-    
+    '''
+    bigrama = Phrases(documentos, min_count=20)
+    for ind in range(len(documentos)):
+        for token in bigrama[documentos[ind]]:
+            if '_' in token:
+                documentos[ind].append(token)
+    '''
+
+    # Creamos un diccionario con los documentos
+    diccionario = Dictionary(documentos)
+
+    # 
+    diccionario.filter_extremes(no_below=20, no_above=0.05)
+
+    # Parametros necesarios para crear el modelo
+    for docuAct in documentos:
+        documentosAux5.append(diccionario.doc2bow(doc))
+
+    corpus = documentosAux5
+    id2word = diccionario.id2token
+    num_topics = numTopicos
+    chunksize = 2000
+    passes = 10
+    iterations = 500
+    #eval_every = 10
+
+    # Creamos el modelo usando LDA
+    modelo = LdaModel(
+        corpus=corpus,
+        id2word=id2word,
+        chunksize=chunksize,
+        alpha='auto',
+        eta='auto',
+        iterations=iterations,
+        num_topics=num_topics,
+        passes=passes,
+        eval_every= None,
+        random_state = 1000
+    )
