@@ -1,11 +1,16 @@
+"""Referencias:
+https://www.kaggle.com/code/soniaahlawat/sentiment-analysis-amazon-review"""
+
 import matplotlib
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 
 # NLTK libraries
 import nltk
 import re
 import string
+import plotly.express as px
 
 from jedi.api.refactoring import inline
 from wordcloud import WordCloud, STOPWORDS
@@ -48,7 +53,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 import seaborn as sns
 from textblob import TextBlob
-from plotly import tools
+from plotly import tools, subplots
 import plotly.graph_objs as go
 from plotly.offline import iplot
 
@@ -75,7 +80,8 @@ stop_words= ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'he
              'his', 'himself', 'ourselves',  'was', 'through', 'out', 'below', 'own', 'myself', 'theirs',
              'me', 'why', 'once',  'him', 'than', 'be', 'most', "you'll", 'same', 'some', 'with', 'few', 'it',
              'at', 'after', 'its', 'which', 'there','our', 'this', 'hers', 'being', 'did', 'of', 'had', 'under',
-             'over','again', 'where', 'those', 'then', "you're", 'i', 'because', 'does', 'all', 'flight', 'plane']
+             'over','again', 'where', 'those', 'then', "you're", 'i', 'because', 'does', 'all', 'flight', 'plane', 'singapore',
+             'airlines', 'airline']
 
 def sent(rating):
     if rating["Overall Rating"] >= 7:
@@ -90,7 +96,7 @@ def sent(rating):
 reviews = pd.read_csv("airlines_reviewsSingapore.csv")
 print("Singapore Airline Dataset:")
 print(reviews.head(5))
-reviews.drop(['Seat Comfort', 'Staff Service', 'Food & Beverages', 'Inflight Entertainment', 'Value For Money'], axis=1,
+reviews.drop(['Seat Comfort', 'Staff Service', 'Food & Beverages', 'Inflight Entertainment', 'Value For Money', 'Airline'], axis=1,
              inplace=True)
 reviews["Sentiment"] = reviews.apply(sent, axis=1)
 print(reviews.head())
@@ -154,6 +160,18 @@ def clean_review(text):
     text = re.sub('\w*\d\w*', '', text)
     return text
 
+# custom function for horizontal bar chart ##
+def horizontal_bar_chart(df, color):
+    trace = go.Bar(
+        y =df["word"].values[::-1],
+        x = df["wordcount"].values[::-1],
+        showlegend = False,
+        orientation = 'h',
+        marker = dict(
+            color = color,
+        ),
+    )
+    return trace
 
 reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
 print(reviews.head())
@@ -172,10 +190,369 @@ for p in ax.patches:
         y = p.get_y() + p.get_height()/2
         ax.annotate(percentage, (x, y))
 
-plt.show()
+#plt.show()
 
 reviews.groupby(['year','Sentiment'])['Sentiment'].count().unstack().plot(legend=True)
 plt.title('Year and Sentiment count')
 plt.xlabel('Year')
 plt.ylabel('Sentiment count')
-plt.show()
+#plt.show()
+
+#Creating a dataframe
+dayreview = pd.DataFrame(reviews.groupby('day')['Reviews_Simp'].count()).reset_index()
+dayreview['day'] = dayreview['day'].astype('int64')
+dayreview.sort_values(by = ['day'])
+
+#Plotting the graph
+sns.barplot(x = "day", y = "Reviews_Simp", data = dayreview)
+plt.title('Day vs Reviews count')
+plt.xlabel('Day')
+plt.ylabel('Reviews count')
+#plt.show()
+
+# Explorar cómo funciona TextBlob para polaridad:
+# Con AFINN:
+reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
+reviews['review_len'] = reviews['Reviews_Simp'].astype(str).apply(len)
+reviews['word_count'] = reviews['Reviews_Simp'].apply(lambda x: len(str(x).split()))
+print(reviews.head())
+
+polarity_df = pd.DataFrame(reviews['polarity'], columns=['polarity'])
+
+# Crear el histograma utilizando Plotly
+fig = go.Figure()
+
+fig.add_trace(go.Histogram(x=polarity_df['polarity'], nbinsx=50, marker_color='skyblue'))
+
+fig.update_layout(
+    title='Sentiment Polarity Distribution',
+    xaxis_title='Polarity',
+    yaxis_title='Count',
+    bargap=0.05,
+    template='plotly_white'
+)
+#fig.show()
+
+#Review lenght
+
+review_len_df = pd.DataFrame(reviews['review_len'], columns=['review_len'])
+
+# Crear el histograma utilizando Plotly
+fig = go.Figure()
+
+fig.add_trace(go.Histogram(x=review_len_df['review_len'], nbinsx=150, marker_color='green'))
+
+fig.update_layout(
+    title='Review Length Distribution',
+    xaxis_title='Review Length',
+    yaxis_title='Count',
+    bargap=0.05,
+    template='plotly_white'
+)
+
+#fig.show()
+#Word count
+
+word_count_df = pd.DataFrame(reviews['word_count'], columns=['word_count'])
+
+# Crear el histograma utilizando Plotly
+fig = go.Figure()
+
+fig.add_trace(go.Histogram(x=word_count_df['word_count'], nbinsx=150, marker_color='pink'))
+
+fig.update_layout(
+    title='Word Count Distribution',
+    xaxis_title='Word count',
+    yaxis_title='Count',
+    bargap=0.05,
+    template='plotly_white'
+)
+
+#fig.show()
+
+#Filtering data
+positive_review = reviews[reviews["Sentiment"]=='Positive'].dropna()
+neutral_review = reviews[reviews["Sentiment"]=='Neutral'].dropna()
+negative_review = reviews[reviews["Sentiment"]=='Negative'].dropna()
+
+## custom function for ngram generation ##
+def generate_ngrams(text, n_gram = 1):
+    token = [token for token in text.lower().split(" ") if token != "" if token not in STOPWORDS]
+    ngrams = zip(*[token[i:] for i in range(n_gram)])
+    return [" ".join(ngram) for ngram in ngrams]
+
+print("Negative Reviews: ")
+print(negative_review.head())
+
+## Get the bar chart from positive reviews ##
+freq_dict = defaultdict(int)
+for sent in positive_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace0 = horizontal_bar_chart(fd_sorted.head(20), 'blue')
+
+
+## Get the bar chart from neutral reviews ##
+freq_dict = defaultdict(int)
+for sent in neutral_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace1 = horizontal_bar_chart(fd_sorted.head(20), 'purple')
+
+## Get the bar chart from negative reviews ##
+freq_dict = defaultdict(int)
+for sent in negative_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace2 = horizontal_bar_chart(fd_sorted.head(20), 'yellow')
+
+# Creating two subplots
+fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing = 0.04,
+                          subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
+                                          "Frequent words of negative reviews"])
+fig.add_trace(trace0, 1, 1)
+fig.add_trace(trace1, 2, 1)
+fig.add_trace(trace2, 3, 1)
+fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
+#iplot(fig, filename='word-plots')
+
+
+# BIGRAMA
+## Get the bar chart from positive reviews ##
+freq_dict = defaultdict(int)
+for sent in positive_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent, 2):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace0 = horizontal_bar_chart(fd_sorted.head(20), 'blue')
+
+
+## Get the bar chart from neutral reviews ##
+freq_dict = defaultdict(int)
+for sent in neutral_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent, 2):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace1 = horizontal_bar_chart(fd_sorted.head(20), 'purple')
+
+
+## Get the bar chart from negative reviews ##
+freq_dict = defaultdict(int)
+for sent in negative_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent, 2):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace2 = horizontal_bar_chart(fd_sorted.head(20), 'yellow')
+
+# Creating two subplots
+fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing = 0.04,
+                          subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
+                                          "Frequent words of negative reviews"])
+fig.add_trace(trace0, 1, 1)
+fig.add_trace(trace1, 2, 1)
+fig.add_trace(trace2, 3, 1)
+fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
+#iplot(fig, filename='word-plots')
+
+# N = 3
+
+## Get the bar chart from positive reviews ##
+freq_dict = defaultdict(int)
+for sent in positive_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent, 3):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace0 = horizontal_bar_chart(fd_sorted.head(20), 'blue')
+
+
+## Get the bar chart from neutral reviews ##
+freq_dict = defaultdict(int)
+for sent in neutral_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent, 3):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace1 = horizontal_bar_chart(fd_sorted.head(20), 'purple')
+
+
+## Get the bar chart from negative reviews ##
+freq_dict = defaultdict(int)
+for sent in negative_review["Reviews_Simp"]:
+    for word in generate_ngrams(sent, 3):
+        freq_dict[word] += 1
+fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
+fd_sorted.columns = ["word", "wordcount"]
+trace2 = horizontal_bar_chart(fd_sorted.head(20), 'yellow')
+
+# Creating two subplots
+fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing = 0.04,
+                          subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
+                                          "Frequent words of negative reviews"])
+fig.add_trace(trace0, 1, 1)
+fig.add_trace(trace1, 2, 1)
+fig.add_trace(trace2, 3, 1)
+fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
+#iplot(fig, filename='word-plots')
+
+#WORDCLOUD
+
+text = positive_review["Reviews_Simp"]
+wordcloud = WordCloud(
+    width = 3000,
+    height = 2000,
+    background_color = 'black',
+    stopwords = STOPWORDS).generate(str(text))
+fig = plt.figure(
+    figsize = (40, 30),
+    facecolor = 'k',
+    edgecolor = 'k')
+plt.imshow(wordcloud, interpolation = 'bilinear')
+plt.axis('off')
+plt.tight_layout(pad=0)
+#plt.show()
+
+text = neutral_review["Reviews_Simp"]
+wordcloud = WordCloud(
+    width = 3000,
+    height = 2000,
+    background_color = 'black',
+    stopwords = STOPWORDS).generate(str(text))
+fig = plt.figure(
+    figsize = (40, 30),
+    facecolor = 'k',
+    edgecolor = 'k')
+plt.imshow(wordcloud, interpolation = 'bilinear')
+plt.axis('off')
+plt.tight_layout(pad=0)
+#plt.show()
+
+
+text = negative_review["Reviews_Simp"]
+wordcloud = WordCloud(
+    width = 3000,
+    height = 2000,
+    background_color = 'black',
+    stopwords = STOPWORDS).generate(str(text))
+fig = plt.figure(
+    figsize = (40, 30),
+    facecolor = 'k',
+    edgecolor = 'k')
+plt.imshow(wordcloud, interpolation = 'bilinear')
+plt.axis('off')
+plt.tight_layout(pad=0)
+#plt.show()
+
+#Extracting features from reviews
+
+# calling the label encoder function
+le = preprocessing.LabelEncoder()
+
+# Encode labels in column 'sentiment'.
+reviews['Sentiment'] = le.fit_transform(reviews['Sentiment'])
+
+reviews['Sentiment'].unique()
+
+print(reviews['Sentiment'].value_counts())
+
+#Extracting 'reviews' for processing
+review_features = reviews.copy()
+review_features = review_features[['Reviews_Simp']].reset_index(drop=True)
+review_features.head()
+
+#tf-idf
+
+tfidf_vectorizer = TfidfVectorizer(max_features = 5000, ngram_range = (2,2))
+# TF-IDF feature matrix
+X = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+print(X.shape)
+
+#Getting the target variable(encoded)
+y = reviews['Sentiment']
+print(y.shape)
+
+#Oversampling
+
+print(f'Original dataset shape : {Counter(y)}')
+
+smote = SMOTE(random_state = 42)
+X_resampled, y_resampled = smote.fit_resample(X, y)
+
+print(f'Resampled dataset shape {Counter(y_resampled)}')
+
+# TRAIN - TEST
+
+## Splitting the dataset into Train and Test
+X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size = 0.2, random_state=0)
+
+
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Purples):
+    """
+    This function prints and plots the confusion matrix.
+    """
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(j, i, cm[i, j],
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
+#creating the objects
+logreg = LogisticRegression(random_state=0)
+dt = DecisionTreeClassifier()
+knn = KNeighborsClassifier()
+svc = SVC()
+nb = BernoulliNB()
+rf = RandomForestClassifier()
+cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2:'KNN', 3:'SVC', 4:'Naive Bayes', 5: 'Random Forest'}
+cv_models = [logreg, dt, knn, svc, nb, rf]
+
+
+for i,model in enumerate(cv_models):
+    print("{} Test Accuracy: {}".format(cv_dict[i],cross_val_score(model, X, y, cv = 10, scoring = 'accuracy').mean()))
+
+param_grid = {'C': np.logspace(-4, 4, 50),
+             'penalty':['l1', 'l2']}
+clf = GridSearchCV(LogisticRegression(random_state = 0), param_grid, cv = 5, verbose = 0,n_jobs = -1)
+best_model = clf.fit(X_train,y_train)
+print(best_model.best_estimator_)
+print("The mean accuracy of the model is:", best_model.score(X_test,y_test))
+
+logreg = LogisticRegression(C = 1526.4179671752304, random_state = 0)
+logreg.fit(X_train, y_train)
+y_pred = logreg.predict(X_test)
+print('Accuracy of logistic regression classifier on test set: {:.2f}'.format(logreg.score(X_test, y_test)))
+
+cm = metrics.confusion_matrix(y_test, y_pred)
+plot_confusion_matrix(cm, classes = ['Positive','Neutral','Negative'])
+print("Classification Report:\n",classification_report(y_test, y_pred))
