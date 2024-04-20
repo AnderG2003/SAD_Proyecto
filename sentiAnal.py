@@ -543,7 +543,8 @@ param_grid = [
     # Parámetros para Logistic Regression
     {
         'C': np.logspace(-4, 4, 50),
-        'penalty': ['l1', 'l2']
+        'penalty': ['l1', 'l2'],
+        'max_iter':[1000]
     },
     # Parámetros para Decision Tree
     {
