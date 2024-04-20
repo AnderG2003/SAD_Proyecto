@@ -43,7 +43,7 @@ from sklearn import preprocessing
 
 # Metrics libraries
 from sklearn import metrics
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, precision_recall_fscore_support
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve, auc
@@ -538,13 +538,55 @@ cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2:'KNN', 3:'SVC', 4:'Na
 cv_models = [logreg, dt, knn, svc, nb, rf]
 
 
-for i,model in enumerate(cv_models):
-    print("{} Test Accuracy: {}".format(cv_dict[i],cross_val_score(model, X, y, cv = 10, scoring = 'accuracy').mean()))
+# Definir los parámetros a buscar para cada clasificador
+param_grid = [
+    # Parámetros para Logistic Regression
+    {
+        'C': np.logspace(-4, 4, 50),
+        'penalty': ['l1', 'l2']
+    },
+    # Parámetros para Decision Tree
+    {
+        'max_depth': [None, 10, 20, 30],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4]
+    },
+    # Parámetros para KNN
+    {
+        'n_neighbors': [3, 5, 7, 10],
+        'weights': ['uniform', 'distance'],
+        'metric': ['euclidean', 'manhattan']
+    },
+    # Parámetros para SVC
+    {
+        'C': [0.1, 1, 10, 100],
+        'gamma': [1, 0.1, 0.01, 0.001],
+        'kernel': ['rbf', 'linear', 'poly', 'sigmoid']
+    },
+    # Parámetros para Naive Bayes
+    {
+        'alpha': [0.1, 0.5, 1.0]
+    },
+    # Parámetros para Random Forest
+    {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [None, 10, 20, 30],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4]
+    }
+]
 
-param_grid = {'C': np.logspace(-4, 4, 50),
-             'penalty':['l1', 'l2']}
-clf = GridSearchCV(LogisticRegression(random_state = 0), param_grid, cv = 5, verbose = 0,n_jobs = -1)
-best_model = clf.fit(X_train,y_train)
+# Crear una lista de los clasificadores y sus correspondientes parámetros
+cv_models = [logreg, dt, knn, svc, nb, rf]
+
+# Realizar la búsqueda de hiperparámetros y evaluación para cada clasificador
+"""for i, (model, params) in enumerate(zip(cv_models, param_grid)):
+    clf = GridSearchCV(model, params, cv=5, verbose=0, n_jobs=-1)
+    best_model = clf.fit(X_train, y_train)
+    print("{} Best Parameters: {}".format(cv_dict[i], best_model.best_params_))
+    print("{} Test Accuracy: {:.2f}".format(cv_dict[i], best_model.best_score_))
+    print("{} Test Accuracy on Test Set: {:.2f}".format(cv_dict[i], best_model.score(X_test, y_test)))
+    print()
 print(best_model.best_estimator_)
 print("The mean accuracy of the model is:", best_model.score(X_test,y_test))
 
@@ -555,4 +597,42 @@ print('Accuracy of logistic regression classifier on test set: {:.2f}'.format(lo
 
 cm = metrics.confusion_matrix(y_test, y_pred)
 plot_confusion_matrix(cm, classes = ['Positive','Neutral','Negative'])
-print("Classification Report:\n",classification_report(y_test, y_pred))
+print("Classification Report:\n",classification_report(y_test, y_pred))"""
+# Crear una lista de los clasificadores entrenados con los mejores parámetros
+best_models = []
+results = []
+
+# Entrenar y evaluar cada modelo
+for i, (model, params) in enumerate(zip(cv_models, param_grid)):
+    # Realizar la búsqueda de hiperparámetros
+    clf = GridSearchCV(model, params, cv=5, verbose=0, n_jobs=-1)
+    best_model = clf.fit(X_train, y_train)
+    best_models.append(best_model.best_estimator_)
+    print("{} Best Parameters: {}".format(cv_dict[i], best_model.best_params_))
+    print("{} Test Accuracy: {:.2f}".format(cv_dict[i], best_model.best_score_))
+
+    # Evaluar el modelo en el conjunto de prueba
+    y_pred = best_model.predict(X_test)
+    accuracy = best_model.score(X_test, y_test)
+    print("{} Test Accuracy on Test Set: {:.2f}".format(cv_dict[i], accuracy))
+
+    # Calcular precision, recall y F-score
+    precision, recall, fscore, _ = precision_recall_fscore_support(y_test, y_pred, average='macro')
+    precision_micro, recall_micro, fscore_micro, _ = precision_recall_fscore_support(y_test, y_pred, average='micro')
+
+    # Almacenar los resultados en la lista
+    results.append({
+        'Model': cv_dict[i],
+        'Precision (macro)': precision,
+        'Recall (macro)': recall,
+        'F-score (macro)': fscore,
+        'Precision (micro)': precision_micro,
+        'Recall (micro)': recall_micro,
+        'F-score (micro)': fscore_micro
+    })
+
+    # Calcular la matriz de confusión y mostrar el informe de clasificación
+    cm = metrics.confusion_matrix(y_test, y_pred)
+    plot_confusion_matrix(cm, classes=['Positive', 'Neutral', 'Negative'])
+    print("Classification Report for {}: \n{}".format(cv_dict[i], classification_report(y_test, y_pred)))
+    print()
