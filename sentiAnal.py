@@ -69,9 +69,15 @@ from collections import defaultdict
 from collections import Counter
 from imblearn.over_sampling import SMOTE
 from scipy.sparse import hstack
+from opencage.geocoder import OpenCageGeocode
+import geocoder
+from geopy.geocoders import Nominatim
+from geopy import distance
+from geopy.distance import great_circle, geodesic
 
 ###############################################################
 ###############################################################
+API_KEY = "6195db615c5f44deabbd7c18adddaf7d"
 
 stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
               'we', 'he', 'my', "you've", 'having', 'in', 'both', 'for', 'themselves', 'are', 'them', 'other',
@@ -86,6 +92,18 @@ stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'h
               'over', 'again', 'where', 'those', 'then', "you're", 'i', 'because', 'does', 'all', 'flight', 'plane',
               'singapore',
               'airlines', 'airline', 'turkish']
+
+corrections_dict = {
+    "Zurich via Singapore": "Zurich",
+    "Siam Reap, Cambodia": "Siem Reap",
+    "Singaporw": "Singapore",
+    "Singaporec": "Singapore",
+    "Singapore Return": "Singapore",
+    "London Heahrow": "London Heathrow",
+    "Singapoe": "Singapore",
+    "Sinhapore": "Singapore",
+    "Qingdoa": "Qingdao",
+}
 
 
 ###############################################################
@@ -126,9 +144,9 @@ def get_scale(route):
 
 def bool_scale(route):
     if 'None' in route:
-        return 'no'
+        return False
     else:
-        return 'yes'
+        return True
 
 
 def clean_review(text):
@@ -156,6 +174,57 @@ def horizontal_bar_chart(df, color):
     return trace
 
 
+def get_lat(route):
+    geocoder = OpenCageGeocode(API_KEY)
+    lat = None
+    query = route
+    results = geocoder.geocode(query)
+    if len(results) > 0:
+        lat = results[0]['geometry']['lat']
+    return lat
+
+
+def get_long(route):
+    geocoder = OpenCageGeocode(API_KEY)
+    query = route
+    results = geocoder.geocode(query)
+    lng = results[0]['geometry']['lng']
+    return lng
+
+
+def get_country(route):
+    geocoder = OpenCageGeocode(API_KEY)
+    query = route
+    results = geocoder.geocode(query)
+    country = results[0]['components']['country']
+    return country
+
+
+def read_country(city):
+    """
+    Convert cities and returns the country
+    """
+    geolocator = Nominatim(user_agent="google")  # user agent can be any user agent
+    location = geolocator.geocode(city,
+                                  language="en")  # specified the language as some countries are in other lanaguages
+
+    if location is None:
+        return None
+
+    if hasattr(location, 'address'):
+        country = location.address.split(',')[-1]  # split the string based on comma and retruns the last element (country)
+        continent = location.address.split(',')[0].strip()
+    latitude = location.latitude
+    longitude = location.longitude
+    location_info = {
+        "country": country,
+        "continent": continent,
+        "latitude": latitude,
+        "longitude": longitude
+    }
+    return location_info
+
+
 ###############################################################
 # PREPROCESO Y LIMPIEZA
 ###############################################################
@@ -171,9 +240,55 @@ reviews["Sentiment"] = reviews.apply(sent, axis=1)
 reviews.drop("Overall Rating", axis=1, inplace=True)
 reviews["Origin"] = reviews["Route"].apply(get_origin)
 reviews["Destiny"] = reviews["Route"].apply(get_destiny)
+reviews["Origin"] = reviews["Origin"].replace(corrections_dict)
+reviews["Destiny"] = reviews["Destiny"].replace(corrections_dict)
 reviews["Scale"] = reviews["Route"].apply(get_scale)
 reviews["Scale_bool"] = reviews["Scale"].apply(bool_scale)
+
+unique_cities = set(reviews["Origin"]).union(set(reviews["Destiny"]))
+
+city_country_dict = {}
+city_cont_dict = {}
+city_lat_dict = {}
+city_long_dict = {}
+
+for city in unique_cities:
+    location_info = read_country(city)
+    if location_info:
+        city_country_dict[city] = location_info.get("country")  # Guardar país
+        city_cont_dict[city] = location_info.get("continent")  # Guardar continente
+        city_lat_dict[city] = location_info.get("latitude")  # Guardar latitud
+        city_long_dict[city] = location_info.get("longitude")  # Guardar longitud
+    else:
+        print(f"Información no encontrada para la ciudad: {city}")
+
+
+def g_att(dict, city):
+    return dict.get(city, "Unknown")
+
+
+# Agregar columnas al DataFrame usando apply y lambda
+reviews["Or_country"] = reviews["Origin"].apply(lambda city: g_att(city_country_dict, city))
+reviews["Dst_country"] = reviews["Destiny"].apply(lambda city: g_att(city_country_dict, city))
+
+reviews["Or_continent"] = reviews["Origin"].apply(lambda city: g_att(city_cont_dict, city))
+reviews["Dst_continent"] = reviews["Destiny"].apply(lambda city: g_att(city_cont_dict, city))
+
+reviews["Or_lat"] = reviews["Origin"].apply(lambda city: g_att(city_lat_dict, city))
+reviews["Dst_lat"] = reviews["Destiny"].apply(lambda city: g_att(city_lat_dict, city))
+
+reviews["Or_long"] = reviews["Origin"].apply(lambda city: g_att(city_long_dict, city))
+reviews["Dst_long"] = reviews["Destiny"].apply(lambda city: g_att(city_long_dict, city))
+
+reviews["distance_km"] = reviews.apply(
+    lambda row: geodesic(
+        (row["Or_lat"], row["Or_long"]),
+        (row["Dst_lat"], row["Dst_long"])
+    ).km, axis=1
+)
+
 print(reviews.head())
+# print(read_country(reviews["Origin"][0]))
 
 # reviews.rename(columns={"Overall Rating": "Sentiment"}, inplace=True)
 ## print shape of dataset with rows and columns and information
@@ -536,31 +651,45 @@ print(reviews['Sentiment'].value_counts())
 
 # Extracting 'reviews' for processing
 review_features = reviews.copy()
-columns = ["Reviews_Simp", "Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
-           "Type of Traveller", "Class"]
+columns = ["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+           "Type of Traveller", "Class", "Scale_bool", "year", "month", "day", "Or_country", "Dst_country",
+           "Or_lat", "Dst_lat", "Dst_long", "Or_long", "distance_km"]
+# columns = ["Reviews_Simp", "Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+#           "Type of Traveller", "Class", "Scale_bool"]
 review_features = review_features[columns].reset_index(drop=True)
 review_features["Verified"] = reviews["Verified"].astype(int)
+review_features["Scale_bool"] = reviews["Scale_bool"].astype(int)
 review_features["Class"] = le.fit_transform(review_features["Class"])
 review_features["Type of Traveller"] = le.fit_transform(review_features["Type of Traveller"])
 review_features["Origin"] = le.fit_transform(review_features["Origin"])
 review_features["Destiny"] = le.fit_transform(review_features["Destiny"])
 review_features["Scale"] = le.fit_transform(review_features["Scale"])
-review_features.head()
+review_features["Or_country"] = le.fit_transform(review_features["Or_country"])
+review_features["Dst_country"] = le.fit_transform(review_features["Dst_country"])
+#review_features["Or_continent"] = le.fit_transform(review_features["Or_continent"])
+#review_features["Dst_continent"] = le.fit_transform(review_features["Or_continent"])
+
+print(review_features.head())
 
 # tf-idf
 
 tfidf_vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(2, 2))
 # TF-IDF feature matrix
-tfidf_reviews = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+# tfidf_reviews = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
 
-#Numerical:
-numerical_ft = review_features[["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
-           "Type of Traveller", "Class"]]
+# Numerical:
+# numerical_ft = review_features[["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+#  "Type of Traveller", "Class", "Scale_bool"]]
+
+numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+                                "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
+                                "month", "day", "distance_km"]]
 scaler = StandardScaler()
 num_sc = scaler.fit_transform(numerical_ft)
-
-X = hstack([tfidf_reviews, num_sc])
-#X = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+#X = numerical_ft
+X = num_sc
+# X = hstack([tfidf_reviews, num_sc])
+# X = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
 print(X.shape)
 
 # Getting the target variable(encoded)
@@ -727,4 +856,4 @@ for i, (model, params) in enumerate(zip(cv_models, param_grid)):
     print("Classification Report for {}: \n{}".format(cv_dict[i], classification_report(y_test, y_pred)))
     print()
 
-reviews.to_csv("turkish_prepared.csv", index=False)
+reviews.to_csv("sing_prepared.csv", index=False)
