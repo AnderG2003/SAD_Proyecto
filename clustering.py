@@ -26,12 +26,16 @@ from sklearn.model_selection import GridSearchCV
 # LLAMADA POR TERMINAL: python clustering.py nombreDeCSV numTopics
 if __name__ == '__main__':
 
+    nombreTop = ["","","","","","","","","",""]
     nombreDatos = sys.argv[1]
     numTopicos = int(sys.argv[2])
     sentimiento = sys.argv[3]   ## CONSULTAR CON SENTIMENTANALYSIS (0 = negativo, 1 = neutral, 2 = positivo)
 
     if numTopicos > 10:
         print("No es posible realizar una ejecución con tantos tópicos.\nRepita la prueba con un número menor por favor.\n")
+        exit(0)
+    elif len(nombreTop) != numTopicos:
+        print("Describe cada tópico lo que es")
         exit(0)
 
     # Cargar los datos del .csv
@@ -103,7 +107,7 @@ if __name__ == '__main__':
     # Creamos un diccionario con los documentos
     diccionario = Dictionary(documentos)
 
-    # 
+    # Filtrar palabras que aparezcan menos de X veces, o más del 5% de los documentos
     diccionario.filter_extremes(no_below=20, no_above=0.05)
 
     # Parametros necesarios para crear el modelo
@@ -131,3 +135,45 @@ if __name__ == '__main__':
         eval_every= None,
         random_state = 1000
     )
+
+    top_topics = modelo.top_topics(corpus)
+
+    #Calcular coherencia respecto a cierto numero de clusters
+    avg_topic_coherence = sum([t[1] for t in top_topics]) / num_topics
+    print('Average topic coherence: %.4f.' % avg_topic_coherence)
+
+    # Mostrar tópicos
+    
+    print(len(top_topics))
+    for i in range(0,int(numTopicos)):
+        print("_____________________________________________")
+        print(top_topics[i])
+
+
+    print("Asumiendo que cada documento solo entra en un tópico, cantidades de documentos por tópico:")
+    
+    # Calcular número de documentos por tópico
+
+    arrayTop = []
+    i = 0
+    lis = [0] * len(top_topics)
+    
+    while i != len(corpus):
+        j = 0
+        maxi = -1
+        base = -1
+        
+        valores = modelo.get_document_topics(corpus[i], minimum_probability=None, minimum_phi_value=None, per_word_topics=False)
+        for val in valores:
+            if val[1] > maxi:
+                maxi = val[1]
+                base = j
+                        
+            j = j + 1
+        arrayTop.append(nombreTop[base])
+        lis[base] = lis[base] + 1
+        i = i + 1
+        
+    # Mostrarlo
+
+    print(lis)
