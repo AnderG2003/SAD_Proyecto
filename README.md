@@ -34,3 +34,6 @@ To-do:
   - [ ] -o output
   - [ ] etc
 - [ ] Guardar los mejores modelos con pickle
+
+### Referencias:
+[Sentiment Analysis Amazon](https://www.kaggle.com/code/soniaahlawat/sentiment-analysis-amazon-review#Review-Text-Word-Count-Distribution)
