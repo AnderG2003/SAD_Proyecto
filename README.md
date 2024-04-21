@@ -35,5 +35,13 @@ To-do:
   - [ ] etc
 - [ ] Guardar los mejores modelos con pickle
 
+## Resultados (21-04-2024)
+![Logistic Regression](/images/lr.png)
+![Decision Tree](/images/dt.png)
+![Random Forest](/images/rf.png)
+![KNN](/images/knn.png)
+![SVC](/images/svc.png)
+![Naive Bayes](/images/nb.png)
+
 ### Referencias:
 [Sentiment Analysis Amazon](https://www.kaggle.com/code/soniaahlawat/sentiment-analysis-amazon-review#Review-Text-Word-Count-Distribution)
