@@ -18,7 +18,7 @@ from nltk.stem.porter import PorterStemmer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from nltk.stem import WordNetLemmatizer
 from collections import Counter
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import SMOTE, ADASYN
 # Machine Learning libraries
 import sklearn
 from sklearn.svm import SVC
@@ -68,20 +68,29 @@ from itertools import cycle
 from collections import defaultdict
 from collections import Counter
 from imblearn.over_sampling import SMOTE
+from scipy.sparse import hstack
+
+###############################################################
+###############################################################
+
+stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
+              'we', 'he', 'my', "you've", 'having', 'in', 'both', 'for', 'themselves', 'are', 'them', 'other',
+              'and', 'an', 'during', 'their', 'can', 'yourself', 'she', 'until', 'so', 'these', 'ours', 'above',
+              'what', 'while', 'have', 're', 'more', 'only', "needn't", 'when', 'just', 'that', 'were', "don't",
+              'very', 'should', 'any', 'y', 'isn', 'who', 'a', 'they', 'to', 'too', "should've", 'has', 'before',
+              'into', 'yours', "it's", 'do', 'against', 'on', 'now', 'her', 've', 'd', 'by', 'am', 'from',
+              'about', 'further', "that'll", "you'd", 'you', 'as', 'how', 'been', 'the', 'or', 'doing', 'such',
+              'his', 'himself', 'ourselves', 'was', 'through', 'out', 'below', 'own', 'myself', 'theirs',
+              'me', 'why', 'once', 'him', 'than', 'be', 'most', "you'll", 'same', 'some', 'with', 'few', 'it',
+              'at', 'after', 'its', 'which', 'there', 'our', 'this', 'hers', 'being', 'did', 'of', 'had', 'under',
+              'over', 'again', 'where', 'those', 'then', "you're", 'i', 'because', 'does', 'all', 'flight', 'plane',
+              'singapore',
+              'airlines', 'airline', 'turkish']
 
 
-stop_words= ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
-             'we', 'he', 'my', "you've", 'having', 'in', 'both', 'for', 'themselves', 'are', 'them', 'other',
-             'and', 'an', 'during', 'their', 'can', 'yourself', 'she', 'until', 'so', 'these', 'ours', 'above',
-             'what', 'while', 'have', 're', 'more', 'only', "needn't", 'when', 'just', 'that', 'were', "don't",
-             'very', 'should', 'any', 'y', 'isn', 'who',  'a', 'they', 'to', 'too', "should've", 'has', 'before',
-             'into', 'yours', "it's", 'do', 'against', 'on',  'now', 'her', 've', 'd', 'by', 'am', 'from',
-             'about', 'further', "that'll", "you'd", 'you', 'as', 'how', 'been', 'the', 'or', 'doing', 'such',
-             'his', 'himself', 'ourselves',  'was', 'through', 'out', 'below', 'own', 'myself', 'theirs',
-             'me', 'why', 'once',  'him', 'than', 'be', 'most', "you'll", 'same', 'some', 'with', 'few', 'it',
-             'at', 'after', 'its', 'which', 'there','our', 'this', 'hers', 'being', 'did', 'of', 'had', 'under',
-             'over','again', 'where', 'those', 'then', "you're", 'i', 'because', 'does', 'all', 'flight', 'plane', 'singapore',
-             'airlines', 'airline']
+###############################################################
+# FUNCIONES
+###############################################################
 
 def sent(rating):
     if rating["Overall Rating"] >= 7:
@@ -93,12 +102,77 @@ def sent(rating):
     return value
 
 
+def get_origin(route):
+    return route.split(' to ')[0]
+
+
+def get_destiny(route):
+    if ' to ' in route:
+        to_parts = route.split(' to ')
+        if ' via ' in to_parts[1]:
+            return to_parts[1].split(' via ')[0]
+        else:
+            return to_parts[1]
+    else:
+        return 'None'
+
+
+def get_scale(route):
+    if ' via ' in route:
+        return route.split(' via ')[1]
+    else:
+        return 'None'
+
+
+def bool_scale(route):
+    if 'None' in route:
+        return 'no'
+    else:
+        return 'yes'
+
+
+def clean_review(text):
+    text = str(text).lower()
+    text = re.sub('\[.*?\]', '', text)
+    text = re.sub('https?://\S+|www\.\S+', '', text)
+    text = re.sub('<.*?>+', '', text)
+    text = re.sub('[%s]' % re.escape(string.punctuation), '', text)
+    text = re.sub('\n', '', text)
+    text = re.sub('\w*\d\w*', '', text)
+    return text
+
+
+# custom function for horizontal bar chart ##
+def horizontal_bar_chart(df, color):
+    trace = go.Bar(
+        y=df["word"].values[::-1],
+        x=df["wordcount"].values[::-1],
+        showlegend=False,
+        orientation='h',
+        marker=dict(
+            color=color,
+        ),
+    )
+    return trace
+
+
+###############################################################
+# PREPROCESO Y LIMPIEZA
+###############################################################
+
 reviews = pd.read_csv("airlines_reviewsSingapore.csv")
 print("Singapore Airline Dataset:")
 print(reviews.head(5))
-reviews.drop(['Seat Comfort', 'Staff Service', 'Food & Beverages', 'Inflight Entertainment', 'Value For Money', 'Airline'], axis=1,
-             inplace=True)
+reviews.drop(
+    ['Seat Comfort', 'Staff Service', 'Food & Beverages', 'Inflight Entertainment', 'Value For Money', 'Airline',
+     'Recommended'], axis=1,
+    inplace=True)
 reviews["Sentiment"] = reviews.apply(sent, axis=1)
+reviews.drop("Overall Rating", axis=1, inplace=True)
+reviews["Origin"] = reviews["Route"].apply(get_origin)
+reviews["Destiny"] = reviews["Route"].apply(get_destiny)
+reviews["Scale"] = reviews["Route"].apply(get_scale)
+reviews["Scale_bool"] = reviews["Scale"].apply(bool_scale)
 print(reviews.head())
 
 # reviews.rename(columns={"Overall Rating": "Sentiment"}, inplace=True)
@@ -109,6 +183,9 @@ print("The Information about the dataset:" + str(reviews.info()))
 # Checking for null values
 print('The null values in the dataset:')
 print(reviews.isnull().sum())
+
+num_duplicates = reviews.duplicated().sum()  # identify duplicates
+print('There are {} duplicate reviews present in the dataset'.format(num_duplicates))
 
 reviews['Rev'] = reviews['Reviews'] + reviews['Title']
 reviews = reviews.drop(['Reviews', 'Title'], axis=1)
@@ -139,76 +216,59 @@ print(reviews.groupby(['year', 'Sentiment']).size())
 print("Verified - wise count of sentiments")
 print(reviews.groupby(['Verified', 'Sentiment']).size())
 
-#print("Route - wise sentiments")
-#print(reviews.groupby(['Route', 'Sentiment']).size())
+# print("Route - wise sentiments")
+# print(reviews.groupby(['Route', 'Sentiment']).size())
 
 print("Passenger - wise count of sentiments")
-repeated_names = reviews['Name'].value_counts()[reviews['Name'].value_counts() > 1].index.tolist()
+repeated_names = reviews['Name'].value_counts()[reviews['Name'].value_counts() > 2].index.tolist()
 
 # Imprimir el conteo de sentimientos solo para los nombres repetidos
 print("Passenger - wise count of sentiments for repeated names:")
 print(reviews[reviews['Name'].isin(repeated_names)].groupby(['Name', 'Sentiment']).size())
 
 # Verified or not?
-def clean_review(text):
-    text = str(text).lower()
-    text = re.sub('\[.*?\]', '', text)
-    text = re.sub('https?://\S+|www\.\S+', '', text)
-    text = re.sub('<.*?>+', '', text)
-    text = re.sub('[%s]' % re.escape(string.punctuation), '', text)
-    text = re.sub('\n', '', text)
-    text = re.sub('\w*\d\w*', '', text)
-    return text
-
-# custom function for horizontal bar chart ##
-def horizontal_bar_chart(df, color):
-    trace = go.Bar(
-        y =df["word"].values[::-1],
-        x = df["wordcount"].values[::-1],
-        showlegend = False,
-        orientation = 'h',
-        marker = dict(
-            color = color,
-        ),
-    )
-    return trace
-
+# Simplificar texto según función clean_review
 reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
 print(reviews.head())
 
-#stop words
-reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
+# Quitar stop words
+reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(
+    lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
 print(reviews.head())
 
-plt.figure(figsize=(6,6))
+#########################################################
+# VISUALIZACIÓN
+#########################################################
+
+plt.figure(figsize=(6, 6))
 plt.title('Percentage of Sentiments')
-ax = sns.countplot(y="Sentiment", data= reviews)
+ax = sns.countplot(y="Sentiment", data=reviews)
 total = len(reviews)
 for p in ax.patches:
-        percentage = '{:.1f}%'.format(100 * p.get_width()/total)
-        x = p.get_x() + p.get_width() + 0.02
-        y = p.get_y() + p.get_height()/2
-        ax.annotate(percentage, (x, y))
+    percentage = '{:.1f}%'.format(100 * p.get_width() / total)
+    x = p.get_x() + p.get_width() + 0.02
+    y = p.get_y() + p.get_height() / 2
+    ax.annotate(percentage, (x, y))
 
-#plt.show()
+# plt.show()
 
-reviews.groupby(['year','Sentiment'])['Sentiment'].count().unstack().plot(legend=True)
+reviews.groupby(['year', 'Sentiment'])['Sentiment'].count().unstack().plot(legend=True)
 plt.title('Year and Sentiment count')
 plt.xlabel('Year')
 plt.ylabel('Sentiment count')
-#plt.show()
+# plt.show()
 
-#Creating a dataframe
+# Creating a dataframe
 dayreview = pd.DataFrame(reviews.groupby('day')['Reviews_Simp'].count()).reset_index()
 dayreview['day'] = dayreview['day'].astype('int64')
-dayreview.sort_values(by = ['day'])
+dayreview.sort_values(by=['day'])
 
-#Plotting the graph
-sns.barplot(x = "day", y = "Reviews_Simp", data = dayreview)
+# Plotting the graph
+sns.barplot(x="day", y="Reviews_Simp", data=dayreview)
 plt.title('Day vs Reviews count')
 plt.xlabel('Day')
 plt.ylabel('Reviews count')
-#plt.show()
+# plt.show()
 
 # Explorar cómo funciona TextBlob para polaridad:
 # Con AFINN:
@@ -231,9 +291,9 @@ fig.update_layout(
     bargap=0.05,
     template='plotly_white'
 )
-#fig.show()
+# fig.show()
 
-#Review lenght
+# Review lenght
 
 review_len_df = pd.DataFrame(reviews['review_len'], columns=['review_len'])
 
@@ -250,8 +310,8 @@ fig.update_layout(
     template='plotly_white'
 )
 
-#fig.show()
-#Word count
+# fig.show()
+# Word count
 
 word_count_df = pd.DataFrame(reviews['word_count'], columns=['word_count'])
 
@@ -268,18 +328,23 @@ fig.update_layout(
     template='plotly_white'
 )
 
-#fig.show()
+# fig.show()
 
-#Filtering data
-positive_review = reviews[reviews["Sentiment"]=='Positive'].dropna()
-neutral_review = reviews[reviews["Sentiment"]=='Neutral'].dropna()
-negative_review = reviews[reviews["Sentiment"]=='Negative'].dropna()
+# Filtering data
+#######################################################################3
+# SEPARAR POSITIVOS/NEGATIVOS/NEUTRALES
+#######################################################################
+positive_review = reviews[reviews["Sentiment"] == 'Positive'].dropna()
+neutral_review = reviews[reviews["Sentiment"] == 'Neutral'].dropna()
+negative_review = reviews[reviews["Sentiment"] == 'Negative'].dropna()
+
 
 ## custom function for ngram generation ##
-def generate_ngrams(text, n_gram = 1):
+def generate_ngrams(text, n_gram=1):
     token = [token for token in text.lower().split(" ") if token != "" if token not in STOPWORDS]
     ngrams = zip(*[token[i:] for i in range(n_gram)])
     return [" ".join(ngram) for ngram in ngrams]
+
 
 print("Negative Reviews: ")
 print(negative_review.head())
@@ -293,7 +358,6 @@ fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
 fd_sorted.columns = ["word", "wordcount"]
 trace0 = horizontal_bar_chart(fd_sorted.head(20), 'blue')
 
-
 ## Get the bar chart from neutral reviews ##
 freq_dict = defaultdict(int)
 for sent in neutral_review["Reviews_Simp"]:
@@ -313,15 +377,14 @@ fd_sorted.columns = ["word", "wordcount"]
 trace2 = horizontal_bar_chart(fd_sorted.head(20), 'yellow')
 
 # Creating two subplots
-fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing = 0.04,
-                          subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
-                                          "Frequent words of negative reviews"])
+fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing=0.04,
+                             subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
+                                             "Frequent words of negative reviews"])
 fig.add_trace(trace0, 1, 1)
 fig.add_trace(trace1, 2, 1)
 fig.add_trace(trace2, 3, 1)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
-#iplot(fig, filename='word-plots')
-
+# iplot(fig, filename='word-plots')
 
 # BIGRAMA
 ## Get the bar chart from positive reviews ##
@@ -329,39 +392,40 @@ freq_dict = defaultdict(int)
 for sent in positive_review["Reviews_Simp"]:
     for word in generate_ngrams(sent, 2):
         freq_dict[word] += 1
+positive_review["bigrams"] = positive_review["Reviews_Simp"].apply(lambda sent: list(generate_ngrams(sent, 2)))
 fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
 fd_sorted.columns = ["word", "wordcount"]
 trace0 = horizontal_bar_chart(fd_sorted.head(20), 'blue')
-
 
 ## Get the bar chart from neutral reviews ##
 freq_dict = defaultdict(int)
 for sent in neutral_review["Reviews_Simp"]:
     for word in generate_ngrams(sent, 2):
         freq_dict[word] += 1
+neutral_review["bigrams"] = neutral_review["Reviews_Simp"].apply(lambda sent: list(generate_ngrams(sent, 2)))
 fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
 fd_sorted.columns = ["word", "wordcount"]
 trace1 = horizontal_bar_chart(fd_sorted.head(20), 'purple')
-
 
 ## Get the bar chart from negative reviews ##
 freq_dict = defaultdict(int)
 for sent in negative_review["Reviews_Simp"]:
     for word in generate_ngrams(sent, 2):
         freq_dict[word] += 1
+negative_review["bigrams"] = negative_review["Reviews_Simp"].apply(lambda sent: list(generate_ngrams(sent, 2)))
 fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
 fd_sorted.columns = ["word", "wordcount"]
 trace2 = horizontal_bar_chart(fd_sorted.head(20), 'yellow')
 
 # Creating two subplots
-fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing = 0.04,
-                          subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
-                                          "Frequent words of negative reviews"])
+fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing=0.04,
+                             subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
+                                             "Frequent words of negative reviews"])
 fig.add_trace(trace0, 1, 1)
 fig.add_trace(trace1, 2, 1)
 fig.add_trace(trace2, 3, 1)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
-#iplot(fig, filename='word-plots')
+# iplot(fig, filename='word-plots')
 
 # N = 3
 
@@ -370,89 +434,95 @@ freq_dict = defaultdict(int)
 for sent in positive_review["Reviews_Simp"]:
     for word in generate_ngrams(sent, 3):
         freq_dict[word] += 1
+positive_review["threegram"] = positive_review["Reviews_Simp"].apply(lambda sent: list(generate_ngrams(sent, 3)))
 fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
 fd_sorted.columns = ["word", "wordcount"]
 trace0 = horizontal_bar_chart(fd_sorted.head(20), 'blue')
-
-
+positive_review.to_csv("turk_pos.csv", index=False)
+fd_sorted.to_csv("sorted.csv", index=False)
 ## Get the bar chart from neutral reviews ##
 freq_dict = defaultdict(int)
 for sent in neutral_review["Reviews_Simp"]:
     for word in generate_ngrams(sent, 3):
         freq_dict[word] += 1
+neutral_review["threegram"] = neutral_review["Reviews_Simp"].apply(lambda sent: list(generate_ngrams(sent, 3)))
 fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
 fd_sorted.columns = ["word", "wordcount"]
 trace1 = horizontal_bar_chart(fd_sorted.head(20), 'purple')
-
+neutral_review.to_csv("turk_neu.csv", index=False)
 
 ## Get the bar chart from negative reviews ##
 freq_dict = defaultdict(int)
 for sent in negative_review["Reviews_Simp"]:
     for word in generate_ngrams(sent, 3):
         freq_dict[word] += 1
+negative_review["threegram"] = negative_review["Reviews_Simp"].apply(lambda sent: list(generate_ngrams(sent, 3)))
 fd_sorted = pd.DataFrame(sorted(freq_dict.items(), key=lambda x: x[1])[::-1])
 fd_sorted.columns = ["word", "wordcount"]
 trace2 = horizontal_bar_chart(fd_sorted.head(20), 'yellow')
+negative_review.to_csv("turk_neg.csv", index=False)
 
 # Creating two subplots
-fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing = 0.04,
-                          subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
-                                          "Frequent words of negative reviews"])
+fig = subplots.make_subplots(rows=3, cols=1, vertical_spacing=0.04,
+                             subplot_titles=["Frequent words of positive reviews", "Frequent words of neutral reviews",
+                                             "Frequent words of negative reviews"])
 fig.add_trace(trace0, 1, 1)
 fig.add_trace(trace1, 2, 1)
 fig.add_trace(trace2, 3, 1)
 fig['layout'].update(height=1200, width=900, paper_bgcolor='rgb(233,233,233)', title="Word Count Plots")
-#iplot(fig, filename='word-plots')
+# iplot(fig, filename='word-plots')
 
-#WORDCLOUD
+# WORDCLOUD
 
 text = positive_review["Reviews_Simp"]
 wordcloud = WordCloud(
-    width = 3000,
-    height = 2000,
-    background_color = 'black',
-    stopwords = STOPWORDS).generate(str(text))
+    width=3000,
+    height=2000,
+    background_color='black',
+    stopwords=STOPWORDS).generate(str(text))
 fig = plt.figure(
-    figsize = (40, 30),
-    facecolor = 'k',
-    edgecolor = 'k')
-plt.imshow(wordcloud, interpolation = 'bilinear')
+    figsize=(40, 30),
+    facecolor='k',
+    edgecolor='k')
+plt.imshow(wordcloud, interpolation='bilinear')
 plt.axis('off')
 plt.tight_layout(pad=0)
-#plt.show()
+# plt.show()
 
 text = neutral_review["Reviews_Simp"]
 wordcloud = WordCloud(
-    width = 3000,
-    height = 2000,
-    background_color = 'black',
-    stopwords = STOPWORDS).generate(str(text))
+    width=3000,
+    height=2000,
+    background_color='black',
+    stopwords=STOPWORDS).generate(str(text))
 fig = plt.figure(
-    figsize = (40, 30),
-    facecolor = 'k',
-    edgecolor = 'k')
-plt.imshow(wordcloud, interpolation = 'bilinear')
+    figsize=(40, 30),
+    facecolor='k',
+    edgecolor='k')
+plt.imshow(wordcloud, interpolation='bilinear')
 plt.axis('off')
 plt.tight_layout(pad=0)
-#plt.show()
+# plt.show()
 
 
 text = negative_review["Reviews_Simp"]
 wordcloud = WordCloud(
-    width = 3000,
-    height = 2000,
-    background_color = 'black',
-    stopwords = STOPWORDS).generate(str(text))
+    width=3000,
+    height=2000,
+    background_color='black',
+    stopwords=STOPWORDS).generate(str(text))
 fig = plt.figure(
-    figsize = (40, 30),
-    facecolor = 'k',
-    edgecolor = 'k')
-plt.imshow(wordcloud, interpolation = 'bilinear')
+    figsize=(40, 30),
+    facecolor='k',
+    edgecolor='k')
+plt.imshow(wordcloud, interpolation='bilinear')
 plt.axis('off')
 plt.tight_layout(pad=0)
-#plt.show()
+# plt.show()
 
-#Extracting features from reviews
+#################################################################
+# Extracting features from reviews
+#################################################################
 
 # calling the label encoder function
 le = preprocessing.LabelEncoder()
@@ -464,35 +534,54 @@ reviews['Sentiment'].unique()
 
 print(reviews['Sentiment'].value_counts())
 
-#Extracting 'reviews' for processing
+# Extracting 'reviews' for processing
 review_features = reviews.copy()
-review_features = review_features[['Reviews_Simp']].reset_index(drop=True)
+columns = ["Reviews_Simp", "Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+           "Type of Traveller", "Class"]
+review_features = review_features[columns].reset_index(drop=True)
+review_features["Verified"] = reviews["Verified"].astype(int)
+review_features["Class"] = le.fit_transform(review_features["Class"])
+review_features["Type of Traveller"] = le.fit_transform(review_features["Type of Traveller"])
+review_features["Origin"] = le.fit_transform(review_features["Origin"])
+review_features["Destiny"] = le.fit_transform(review_features["Destiny"])
+review_features["Scale"] = le.fit_transform(review_features["Scale"])
 review_features.head()
 
-#tf-idf
+# tf-idf
 
-tfidf_vectorizer = TfidfVectorizer(max_features = 5000, ngram_range = (2,2))
+tfidf_vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(2, 2))
 # TF-IDF feature matrix
-X = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+tfidf_reviews = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+
+#Numerical:
+numerical_ft = review_features[["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+           "Type of Traveller", "Class"]]
+scaler = StandardScaler()
+num_sc = scaler.fit_transform(numerical_ft)
+
+X = hstack([tfidf_reviews, num_sc])
+#X = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
 print(X.shape)
 
-#Getting the target variable(encoded)
+# Getting the target variable(encoded)
 y = reviews['Sentiment']
 print(y.shape)
 
-#Oversampling
+# Oversampling
 
 print(f'Original dataset shape : {Counter(y)}')
 
-smote = SMOTE(random_state = 42)
+adasyn = ADASYN()
+smote = SMOTE(random_state=42)
 X_resampled, y_resampled = smote.fit_resample(X, y)
+# X_resampled, y_resampled = adasyn.fit_resample(X, y)
 
 print(f'Resampled dataset shape {Counter(y_resampled)}')
 
 # TRAIN - TEST
 
 ## Splitting the dataset into Train and Test
-X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size = 0.2, random_state=0)
+X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=0)
 
 
 def plot_confusion_matrix(cm, classes,
@@ -527,16 +616,16 @@ def plot_confusion_matrix(cm, classes,
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
 
-#creating the objects
+
+# creating the objects
 logreg = LogisticRegression(random_state=0)
 dt = DecisionTreeClassifier()
 knn = KNeighborsClassifier()
 svc = SVC()
 nb = BernoulliNB()
 rf = RandomForestClassifier()
-cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2:'KNN', 3:'SVC', 4:'Naive Bayes', 5: 'Random Forest'}
+cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2: 'KNN', 3: 'SVC', 4: 'Naive Bayes', 5: 'Random Forest'}
 cv_models = [logreg, dt, knn, svc, nb, rf]
-
 
 # Definir los parámetros a buscar para cada clasificador
 param_grid = [
@@ -544,7 +633,7 @@ param_grid = [
     {
         'C': np.logspace(-4, 4, 50),
         'penalty': ['l1', 'l2'],
-        'max_iter':[1000]
+        'max_iter': [1000]
     },
     # Parámetros para Decision Tree
     {
@@ -637,3 +726,5 @@ for i, (model, params) in enumerate(zip(cv_models, param_grid)):
     plot_confusion_matrix(cm, classes=['Positive', 'Neutral', 'Negative'])
     print("Classification Report for {}: \n{}".format(cv_dict[i], classification_report(y_test, y_pred)))
     print()
+
+reviews.to_csv("turkish_prepared.csv", index=False)
