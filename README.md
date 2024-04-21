@@ -20,8 +20,8 @@ To-do:
   - [x] Unir comentario y title
   - [ ] Latitud longitud ?
   - [x] Oversampling
-  - [ ] Train - dev - test
-  - [ ] Overall Rating -> Sentiment
+  - [x] Train - dev - test
+  - [x] Overall Rating -> Sentiment
 - [x] Algoritmos:
   - [x] Logistic Regression
   - [x] KNN
