@@ -22,6 +22,7 @@ To-do:
   - [x] Oversampling
   - [x] Train - dev - test
   - [x] Overall Rating -> Sentiment
+  - [ ] Seleccionar las features relevantes (Filtrado, wrapped, PCA...)
 - [x] Algoritmos:
   - [x] Logistic Regression
   - [x] KNN
