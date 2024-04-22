@@ -56,6 +56,7 @@ from textblob import TextBlob
 from plotly import tools, subplots
 import plotly.graph_objs as go
 from plotly.offline import iplot
+from sklearn.feature_selection import SequentialFeatureSelector
 
 # Ignore warnings
 import warnings
@@ -74,6 +75,7 @@ import geocoder
 from geopy.geocoders import Nominatim
 from geopy import distance
 from geopy.distance import great_circle, geodesic
+from scipy.stats import pearsonr
 
 ###############################################################
 ###############################################################
@@ -212,7 +214,8 @@ def read_country(city):
         return None
 
     if hasattr(location, 'address'):
-        country = location.address.split(',')[-1]  # split the string based on comma and retruns the last element (country)
+        country = location.address.split(',')[
+            -1]  # split the string based on comma and retruns the last element (country)
         continent = location.address.split(',')[0].strip()
     latitude = location.latitude
     longitude = location.longitude
@@ -635,6 +638,7 @@ plt.axis('off')
 plt.tight_layout(pad=0)
 # plt.show()
 
+
 #################################################################
 # Extracting features from reviews
 #################################################################
@@ -666,8 +670,11 @@ review_features["Destiny"] = le.fit_transform(review_features["Destiny"])
 review_features["Scale"] = le.fit_transform(review_features["Scale"])
 review_features["Or_country"] = le.fit_transform(review_features["Or_country"])
 review_features["Dst_country"] = le.fit_transform(review_features["Dst_country"])
-#review_features["Or_continent"] = le.fit_transform(review_features["Or_continent"])
-#review_features["Dst_continent"] = le.fit_transform(review_features["Or_continent"])
+#review_features["year"] = review_features["year"].astype("int")
+#review_features["month"] = review_features["month"].astype("int")
+#review_features["day"] = review_features["day"].astype("int")
+# review_features["Or_continent"] = le.fit_transform(review_features["Or_continent"])
+# review_features["Dst_continent"] = le.fit_transform(review_features["Or_continent"])
 
 print(review_features.head())
 
@@ -681,11 +688,47 @@ tfidf_vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(2, 2))
 # numerical_ft = review_features[["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
 #  "Type of Traveller", "Class", "Scale_bool"]]
 
+# numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+#                                "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
+#                                "month", "day", "distance_km", "Or_lat", "Dst_lat", "Or_long", "Dst_long"]]
+
+#LAS MEJORES PARA SVC:
 numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-                                "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
-                                "month", "day", "distance_km"]]
+                                "Type of Traveller", "Scale_bool", "Or_country", "Dst_country", "year", "Class", "day",
+                                "distance_km", "month"]]
+
+#LAS MEJORES PARA KNN:
+# numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+#                                "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
+#                                "Or_lat", "Dst_lat", "Or_long", "Dst_long", "month", "day"]]
 scaler = StandardScaler()
 num_sc = scaler.fit_transform(numerical_ft)
+
+#################################################################
+# Important features:
+#################################################################
+correlations = {}
+for column in numerical_ft.columns:
+    # Asegúrate de que ambas columnas son numéricas
+    if numerical_ft[column].dtype in ['int64', 'float64']:
+        correlation, _ = pearsonr(numerical_ft[column], reviews['Sentiment'])
+        correlations[column] = correlation
+    else:
+        print(f"La columna '{column}' no es numérica y no se puede calcular la correlación.")
+
+# Ordenar las características por valor de correlación
+# important_features = sorted(correlations, key=correlations.get, reverse=True)
+
+# print("Características ordenadas por correlación:", important_features)
+# Crear una lista de tuplas con la característica y su correlación
+feature_correlations = [(col, correlations[col]) for col in sorted(correlations, key=correlations.get, reverse=True)]
+
+# Mostrar la lista de características y sus correlaciones
+print("Características ordenadas por correlación con su valor de correlación:")
+for feature, correlation in feature_correlations:
+    print(f"{feature}: {correlation:.3f}")
+
+##########################################################################
 #X = numerical_ft
 X = num_sc
 # X = hstack([tfidf_reviews, num_sc])
@@ -824,9 +867,28 @@ results = []
 # Entrenar y evaluar cada modelo
 for i, (model, params) in enumerate(zip(cv_models, param_grid)):
     # Realizar la búsqueda de hiperparámetros
+   # sfs = SequentialFeatureSelector(model, direction='forward', n_features_to_select=5)
+   # sfs.fit(X_train, y_train)
+
+   # if isinstance(X_train, pd.DataFrame):
+    #    selected_features = X_train.columns[sfs.get_support()]
+   # elif isinstance(X_train, np.ndarray):
+   #     selected_features = [numerical_ft[i] for i in range(len(numerical_ft)) if sfs.get_support()[i]]
+
+   # X_train_selected = X_train[selected_features]
+   # X_test_selected = X_test[selected_features]
+
     clf = GridSearchCV(model, params, cv=5, verbose=0, n_jobs=-1)
     best_model = clf.fit(X_train, y_train)
     best_models.append(best_model.best_estimator_)
+    # if hasattr(best_model, 'feature_importances_'):
+    #   importances = best_model.feature_importances_
+    #  feature_importance_df = pd.DataFrame({
+    #     'feature': review_features.feature_names,
+    #    'importance': importances
+    # })
+    # feature_importance_df = feature_importance_df.sort_values(by='importance', ascending=False)
+
     print("{} Best Parameters: {}".format(cv_dict[i], best_model.best_params_))
     print("{} Test Accuracy: {:.2f}".format(cv_dict[i], best_model.best_score_))
 
