@@ -18,11 +18,13 @@ To-do:
   - [x] Lematizar, normalizar, simplificar, quitar palabras habituales (?)
   - [x] Separar ruta en origen - destino - escalas
   - [x] Unir comentario y title
-  - [ ] Latitud longitud ?
+  - [x] Latitud longitud ?
   - [x] Oversampling
   - [x] Train - dev - test
   - [x] Overall Rating -> Sentiment
   - [ ] Seleccionar las features relevantes (Filtrado, wrapped, PCA...)
+    - [x] Correlación
+    - [ ] Automatizar la selección
 - [x] Algoritmos:
   - [x] Logistic Regression
   - [x] KNN
@@ -35,6 +37,7 @@ To-do:
   - [ ] -o output
   - [ ] etc
 - [ ] Guardar los mejores modelos con pickle
+- [ ] Separar los dos clasificadores
 
 ## Resultados (21-04-2024)
 ![Logistic Regression](/images/lr.png)
