@@ -43,7 +43,8 @@ from sklearn import preprocessing
 
 # Metrics libraries
 from sklearn import metrics
-from sklearn.metrics import classification_report, precision_recall_fscore_support
+from sklearn.metrics import classification_report, precision_recall_fscore_support, accuracy_score, make_scorer, \
+    f1_score
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve, auc
@@ -373,10 +374,15 @@ reviews['Sentiment'] = le.fit_transform(reviews['Sentiment'])
 reviews['Sentiment'].unique()
 
 print(reviews['Sentiment'].value_counts())
+# Positive -> 2
+# Neutral -> 1
+# Negative -> 0
 
 # Extracting 'reviews' for processing
 review_features = reviews.copy()
-columns = ["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+columns = ["Reviews_Simp"]
+review_features = review_features[columns].reset_index(drop=True)
+"""columns = ["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
            "Type of Traveller", "Class", "Scale_bool", "year", "month", "day", "Or_country", "Dst_country",
            "Or_lat", "Dst_lat", "Dst_long", "Or_long", "distance_km"]
 # columns = ["Reviews_Simp", "Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
@@ -395,7 +401,7 @@ review_features["year"] = review_features["year"].astype("int")
 review_features["month"] = review_features["month"].astype("int")
 review_features["day"] = review_features["day"].astype("int")
 # review_features["Or_continent"] = le.fit_transform(review_features["Or_continent"])
-# review_features["Dst_continent"] = le.fit_transform(review_features["Or_continent"])
+# review_features["Dst_continent"] = le.fit_transform(review_features["Or_continent"])"""
 
 print(review_features.head())
 
@@ -403,7 +409,7 @@ print(review_features.head())
 
 tfidf_vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(2, 2))
 # TF-IDF feature matrix
-# tfidf_reviews = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+tfidf_reviews = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
 
 # Numerical:
 # numerical_ft = review_features[["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
@@ -414,21 +420,21 @@ tfidf_vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(2, 2))
 #                                "month", "day", "distance_km", "Or_lat", "Dst_lat", "Or_long", "Dst_long"]]
 
 #LAS MEJORES PARA SVC:
-numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-                                "Type of Traveller", "Scale_bool", "Or_country", "Dst_country", "year", "Class", "day",
-                                "distance_km", "month"]]
+#numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+ #                               "Type of Traveller", "Scale_bool", "Or_country", "Dst_country", "year", "Class", "day",
+ #                               "distance_km", "month"]]
 
 #LAS MEJORES PARA KNN:
 # numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
 #                                "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
 #                                "Or_lat", "Dst_lat", "Or_long", "Dst_long", "month", "day"]]
-scaler = StandardScaler()
-num_sc = scaler.fit_transform(numerical_ft)
+#scaler = StandardScaler()
+#num_sc = scaler.fit_transform(numerical_ft)
 
 #################################################################
 # Important features:
 #################################################################
-correlations = {}
+"""correlations = {}
 for column in numerical_ft.columns:
     # Asegúrate de que ambas columnas son numéricas
     if numerical_ft[column].dtype in ['int64', 'float64']:
@@ -447,13 +453,14 @@ feature_correlations = [(col, correlations[col]) for col in sorted(correlations,
 # Mostrar la lista de características y sus correlaciones
 print("Características ordenadas por correlación con su valor de correlación:")
 for feature, correlation in feature_correlations:
-    print(f"{feature}: {correlation:.3f}")
+    print(f"{feature}: {correlation:.3f}")"""
 
 ##########################################################################
 #X = numerical_ft
-X = num_sc
+#X = num_sc
 # X = hstack([tfidf_reviews, num_sc])
-# X = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+#X = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
+X = tfidf_reviews
 print(X.shape)
 
 # Getting the target variable(encoded)
@@ -470,6 +477,14 @@ X_resampled, y_resampled = smote.fit_resample(X, y)
 # X_resampled, y_resampled = adasyn.fit_resample(X, y)
 
 print(f'Resampled dataset shape {Counter(y_resampled)}')
+
+# TRAIN - DEV - TEST (No hay tantos datos como para que sea eficaz?)
+
+#X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# Luego, dividir el resto en dev y test
+#X_dev, X_test, y_dev, y_test = train_test_split(X_temp, y_temp, test_size=0.5, random_state=42)
+
 
 # TRAIN - TEST
 
@@ -584,6 +599,7 @@ print("Classification Report:\n",classification_report(y_test, y_pred))"""
 # Crear una lista de los clasificadores entrenados con los mejores parámetros
 best_models = []
 results = []
+cv_results_dfs = []
 
 # Entrenar y evaluar cada modelo
 for i, (model, params) in enumerate(zip(cv_models, param_grid)):
@@ -599,7 +615,10 @@ for i, (model, params) in enumerate(zip(cv_models, param_grid)):
    # X_train_selected = X_train[selected_features]
    # X_test_selected = X_test[selected_features]
 
-    clf = GridSearchCV(model, params, cv=5, verbose=0, n_jobs=-1)
+#GridSearch -> cv = 5 (estándar), cv = 10 (para conjuntos pequeños, más preciso)
+#No hay mejoras significativas entre cv=5 y cv=10, lo dejamos en 5.
+
+    clf = GridSearchCV(model, params, cv=5, scoring=make_scorer(f1_score, average='weighted'), verbose=0, n_jobs=-1)
     best_model = clf.fit(X_train, y_train)
     best_models.append(best_model.best_estimator_)
     # if hasattr(best_model, 'feature_importances_'):
@@ -618,25 +637,51 @@ for i, (model, params) in enumerate(zip(cv_models, param_grid)):
     accuracy = best_model.score(X_test, y_test)
     print("{} Test Accuracy on Test Set: {:.2f}".format(cv_dict[i], accuracy))
 
-    # Calcular precision, recall y F-score
-    precision, recall, fscore, _ = precision_recall_fscore_support(y_test, y_pred, average='macro')
-    precision_micro, recall_micro, fscore_micro, _ = precision_recall_fscore_support(y_test, y_pred, average='micro')
+    cv_results = pd.DataFrame(clf.cv_results_)
+    for j in range(len(cv_results)):
+        # Calcular precision, recall y F-score
+        #best_model.set_params(**cv_results.loc[j, 'params'])  # Establece la configuración de hiperparámetros
+        y_pred = best_model.predict(X_test)  # Pr
+        precision, recall, fscore, _ = precision_recall_fscore_support(y_test, y_pred, average='macro')
+        precision_micro, recall_micro, fscore_micro, _ = precision_recall_fscore_support(y_test, y_pred, average='micro')
 
-    # Almacenar los resultados en la lista
-    results.append({
-        'Model': cv_dict[i],
-        'Precision (macro)': precision,
-        'Recall (macro)': recall,
-        'F-score (macro)': fscore,
-        'Precision (micro)': precision_micro,
-        'Recall (micro)': recall_micro,
-        'F-score (micro)': fscore_micro
-    })
+        # Crear DataFrame para resultados específicos
+        results_df = pd.DataFrame({
+            'Model': cv_dict[i],  # Nombre del modelo
+            'Params': str(cv_results.loc[j, 'params']),  # Hiperparámetros
+            'Class': ['Positive', 'Neutral', 'Negative'],  # Clases
+            'Precision': precision,
+            'Recall': recall,
+            'F-score': fscore,
+            'micro-prec': precision_micro,
+            'micro-recall': recall_micro,
+            'micro-fscore': fscore_micro
+        })
+        cv_results = pd.DataFrame(clf.cv_results_)
+        # Agregar DataFrame a la lista de resultados
+        cv_results_dfs.append(results_df)
 
     # Calcular la matriz de confusión y mostrar el informe de clasificación
     cm = metrics.confusion_matrix(y_test, y_pred)
     plot_confusion_matrix(cm, classes=['Positive', 'Neutral', 'Negative'])
     print("Classification Report for {}: \n{}".format(cv_dict[i], classification_report(y_test, y_pred)))
     print()
+    for k in range(0,3):
+        scoring = make_scorer(f1_score, labels=[k], average=None)
+        clf_positive = GridSearchCV(
+            SVC(),
+            param_grid,
+            cv=5,
+            scoring=scoring,
+            n_jobs=-1
+        )
+        clf.fit(X_train, y_train)
+        print("Mejores hiperparámetros para la clase ", k, ": ", clf.best_params_)
+
+final_results_df = pd.concat(cv_results_dfs, ignore_index=True)
+
+# Guardar en un archivo CSV
+final_results_df.to_csv('final_results.csv', index=False)
+
 
 reviews.to_csv("sing_prepared.csv", index=False)
