@@ -1,83 +1,49 @@
 import getopt
-import sys
-import numpy as np
-import pandas as pd
-import pickle
 import os
-
-# NLTK libraries
-import nltk
+import pickle
 import re
 import string
-import plotly.express as px
-
-from jedi.api.refactoring import inline
-from wordcloud import WordCloud, STOPWORDS
-from nltk.stem.porter import PorterStemmer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from nltk.stem import WordNetLemmatizer
-from collections import Counter
-from imblearn.over_sampling import SMOTE, ADASYN
-# Machine Learning libraries
-import sklearn
-from sklearn.svm import SVC
-from sklearn.preprocessing import LabelEncoder
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.ensemble import ExtraTreesClassifier
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import GridSearchCV
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.naive_bayes import BernoulliNB
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.multiclass import OneVsRestClassifier
-from sklearn.svm import SVC
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import label_binarize
-from sklearn import svm, datasets
-from sklearn import preprocessing
-
-# Metrics libraries
-from sklearn import metrics
-from sklearn.metrics import classification_report, precision_recall_fscore_support, accuracy_score, make_scorer, \
-    f1_score
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import roc_curve, auc
-
-# Visualization libraries
-import matplotlib.pyplot as plt
-from matplotlib import rcParams
-import seaborn as sns
-from textblob import TextBlob
-from plotly import tools, subplots
-import plotly.graph_objs as go
-from plotly.offline import iplot
-from sklearn.feature_selection import SequentialFeatureSelector
-
+import sys
 # Ignore warnings
 import warnings
+
+# NLTK libraries
+from nltk.stem.porter import PorterStemmer
+# Visualization libraries
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from imblearn.over_sampling import ADASYN
+# Metrics libraries
+from sklearn import metrics
+from sklearn import preprocessing
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, precision_recall_fscore_support, make_scorer, \
+    f1_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.neighbors import KNeighborsClassifier
+# Machine Learning libraries
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from textblob import TextBlob
 
 adasyn = ADASYN()
 
 warnings.filterwarnings('ignore')
 
 # Other miscellaneous libraries
-from scipy import interp
-from itertools import cycle
-from collections import defaultdict
-from collections import Counter
 from imblearn.over_sampling import SMOTE
-from scipy.sparse import hstack
-from opencage.geocoder import OpenCageGeocode
-import geocoder
 from geopy.geocoders import Nominatim
-from geopy import distance
-from geopy.distance import great_circle, geodesic
+from geopy.distance import geodesic
 from scipy.stats import pearsonr
+from collections import Counter
+
+stemmer = PorterStemmer()
 
 INPUT_FILE = "airlines_reviewsSingapore.csv"
 OUT_FILE = "Modelos"
@@ -275,6 +241,9 @@ def csv_to_dict(file):
     return data_dict
 
 
+def stem_words(text):
+    return " ".join([stemmer.stem(word) for word in text.split()])
+
 ############### MAIN #################
 
 def main():
@@ -426,20 +395,37 @@ def main():
 
     ################### PROCESAR TEXTO #######################
 
-    # Simplificar texto según función clean_review
-    reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
-    print(reviews.head())
+    if TEXTO == "True":
+        # Simplificar texto según función clean_review
+        reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
+        print(reviews.head())
 
-    # Quitar stop words
-    reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(
-        lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
-    print(reviews.head())
+        # Quitar stop words
+        reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(
+            lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
+        print(reviews.head())
 
-    # DATOS EXTRAÍDOS:
-    reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
-    reviews['review_len'] = reviews['Reviews_Simp'].astype(str).apply(len)
-    reviews['word_count'] = reviews['Reviews_Simp'].apply(lambda x: len(str(x).split()))
-    print(reviews.head())
+        # Contador de palabras
+        cnt = Counter()
+        for text in reviews["Reviews_Simp"].values:
+            for word in text.split():
+                cnt[word] += 1
+
+        print(cnt.most_common(10))
+
+        # Stem words: LOS RESULTADOS EMPEORAN
+
+        #reviews["Reviews_Simp"] = reviews["Reviews_Simp"].apply(lambda text: stem_words(text))
+        #print(reviews.head())
+
+        #PROCESAMIENTO DE EMOTICONOS -> CONVERTIR A TEXTO
+        #https://www.kaggle.com/code/sudalairajkumar/getting-started-with-text-preprocessing
+
+        # DATOS EXTRAÍDOS:
+        reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
+        reviews['review_len'] = reviews['Reviews_Simp'].astype(str).apply(len)
+        reviews['word_count'] = reviews['Reviews_Simp'].apply(lambda x: len(str(x).split()))
+        print(reviews.head())
 
     #################### FEATURES ##############################3
 
@@ -679,6 +665,7 @@ def main():
     final_results_df.to_csv('final_results.csv', index=False)
 
     df_metrics = pd.DataFrame(results)
+    df_metrics.to_csv("metricas_act.csv")
     df_metrics = df_metrics.sort_values(by='Best_Score', ascending=False)
 
     if TEXTO == "True":
