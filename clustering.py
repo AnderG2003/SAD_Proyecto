@@ -23,8 +23,31 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.model_selection import GridSearchCV
 
+import logging
+from gensim.corpora import Dictionary
+from gensim.models import LdaModel
+from nltk.tokenize import RegexpTokenizer
+from nltk.stem.wordnet import WordNetLemmatizer
+from gensim.models import Phrases
+from gensim.models import CoherenceModel
+
+
 # LLAMADA POR TERMINAL: python clustering.py nombreDeCSV numTopics
 if __name__ == '__main__':
+
+    stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
+              'we', 'he', 'my', "you've", 'having', 'in', 'both', 'for', 'themselves', 'are', 'them', 'other',
+              'and', 'an', 'during', 'their', 'can', 'yourself', 'she', 'until', 'so', 'these', 'ours', 'above',
+              'what', 'while', 'have', 're', 'more', 'only', "needn't", 'when', 'just', 'that', 'were', "don't",
+              'very', 'should', 'any', 'y', 'isn', 'who', 'a', 'they', 'to', 'too', "should've", 'has', 'before',
+              'into', 'yours', "it's", 'do', 'against', 'on', 'now', 'her', 've', 'd', 'by', 'am', 'from',
+              'about', 'further', "that'll", "you'd", 'you', 'as', 'how', 'been', 'the', 'or', 'doing', 'such',
+              'his', 'himself', 'ourselves', 'was', 'through', 'out', 'below', 'own', 'myself', 'theirs',
+              'me', 'why', 'once', 'him', 'than', 'be', 'most', "you'll", 'same', 'some', 'with', 'few', 'it',
+              'at', 'after', 'its', 'which', 'there', 'our', 'this', 'hers', 'being', 'did', 'of', 'had', 'under',
+              'over', 'again', 'where', 'those', 'then', "you're", 'i', 'because', 'does', 'all', 'flight', 'plane',
+              'singapore',
+              'airlines', 'airline', 'turkish']
 
     nombreTop = ["","","","","","","","","",""]
     nombreDatos = sys.argv[1]
@@ -40,7 +63,7 @@ if __name__ == '__main__':
 
     # Cargar los datos del .csv
     ml_dataset = pd.read_csv(nombreDatos, header=0)
-    ml_dataset = ml_dataset[~ml_dataset["Reviews"].isnull()]
+    ml_dataset = ml_dataset[~ml_dataset['content'].isnull()]
 
     # FUTUROS FILTRADOS DE DATOS AQUÍ
     '''
@@ -51,7 +74,7 @@ if __name__ == '__main__':
     copia = ml_dataset
     
     # Trabajamos con los textos de las reviews
-    documentos = ml_dataset["Reviews"].toList()
+    documentos = ml_dataset["content"]#.toList()
 
     # Nos aseguramos de que está todo en minusculas
     for i in range(0, len(documentos)):
@@ -60,7 +83,7 @@ if __name__ == '__main__':
     # Por cada review, creamos una lista con las palabras de la review
     documentosAux = []
     for docuAct in documentos:
-        documentosAux.append(d.split())
+        documentosAux.append(docuAct.split())
 
     documentos = documentosAux
     
@@ -69,7 +92,7 @@ if __name__ == '__main__':
     for docuAct in documentos:
         filtered_doc = []
         for token in docuAct:
-            if token not in stopWords:
+            if token not in stop_words:
                 filtered_doc.append(token)
         documentosAux3.append(filtered_doc)
 
@@ -107,14 +130,15 @@ if __name__ == '__main__':
     '''
 
     # Creamos un diccionario con los documentos
-    diccionario = Dictionary(documentos)
+    diccionario = Dictionary(documentos) 
 
     # Filtrar palabras que aparezcan menos de X veces, o más del 5% de los documentos
     diccionario.filter_extremes(no_below=20, no_above=0.05)
 
     # Parametros necesarios para crear el modelo
+    documentosAux5 = []
     for docuAct in documentos:
-        documentosAux5.append(diccionario.doc2bow(doc))
+        documentosAux5.append(diccionario.doc2bow(docuAct))
 
     corpus = documentosAux5
     id2word = diccionario.id2token
