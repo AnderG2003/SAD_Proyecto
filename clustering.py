@@ -48,6 +48,8 @@ if __name__ == '__main__':
     ml_dataset = ml_dataset[ml_dataset["NOMBRECOLUMNA"] == sentimiento]]  ## CONSULTAR CON SENTIMENTANALYSIS
     '''
 
+    copia = ml_dataset
+    
     # Trabajamos con los textos de las reviews
     documentos = ml_dataset["Reviews"].toList()
 
@@ -177,3 +179,6 @@ if __name__ == '__main__':
     # Mostrarlo
 
     print(lis)
+
+    copia["razón negativa"] = np.array(arrayTop).tolist()
+    copia.to_csv("archivo.csv")
