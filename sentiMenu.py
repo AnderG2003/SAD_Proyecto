@@ -21,7 +21,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, precision_recall_fscore_support, make_scorer, \
-    f1_score
+    f1_score, recall_score, precision_score, accuracy_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import BernoulliNB
@@ -49,6 +49,7 @@ INPUT_FILE = "airlines_reviewsSingapore.csv"
 OUT_FILE = "Modelos"
 TEXTO = "False"
 OVERSAMPLING = 'smote'
+METRICA = "fscore"
 
 stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
               'we', 'he', 'my', "you've", 'having', 'in', 'both', 'for', 'themselves', 'are', 'them', 'other',
@@ -90,17 +91,20 @@ def usage():
     print("OPCIONES PARA ANÁLISIS DE SENTIMIENTOS DE AEROLÍNEA SINGAPUR")
     print(f"-h, --help      show the usage")
     print(f"-i, --input     input file path of the data   DEFAULT: ./{INPUT_FILE}")
-    print(f"-o, --output    output file path for the weights            DEFAULT: ./{OUT_FILE}")
-    print(f"-t, --text      ¿Se usará el texto como feature?  DEFAULT: ./{TEXTO} || True o False")
-    print(f"-s, --sampling   Método para oversampling  DEFAULT: ./{OVERSAMPLING} || smote o adasyn")
-    print("")
+    print(f"-o, --output    output dir path for the weights     DEFAULT: {OUT_FILE}")
+    print(f"-t, --text      ¿Se usará el texto como feature?  DEFAULT: {TEXTO} ")
+    print("      --> Opciones (2): True / False")
+    print(f"-s, --sampling   Método para oversampling  DEFAULT: {OVERSAMPLING} ")
+    print("      --> Opciones (2): smote / adasyn")
+    print(f"-m, --metric     Métrica para decidir el mejor modelo DEFAULT: ./{METRICA}")
+    print("      --> Opciones (4): fscore / accuracy / precision / recall")
 
     # Salimos del programa
     exit(1)
 
 
 def load_options(options):
-    global INPUT_FILE, OUT_FILE, TEXTO, OVERSAMPLING
+    global INPUT_FILE, OUT_FILE, TEXTO, OVERSAMPLING, METRICA
 
     for opt, arg in options:
         if opt in ('-i', '--input'):
@@ -111,6 +115,8 @@ def load_options(options):
             OVERSAMPLING = str(arg)
         elif opt in ('-t', '--text'):
             TEXTO = str(arg)
+        elif opt in ('-m', '--metric'):
+            METRICA = str(arg)
         elif opt in ('-h', '--help'):
             usage()
 
@@ -248,6 +254,7 @@ def stem_words(text):
 
 def main():
     reviews = pd.read_csv(INPUT_FILE)
+    tableau = pd.DataFrame()
     print("Singapore Airline Dataset:")
     print(reviews.head(5))
 
@@ -263,6 +270,9 @@ def main():
     existing_columns = [col for col in columns_to_drop if col in reviews.columns]
     # Eliminar solo las columnas que existen
     if existing_columns:
+        tableau = reviews[existing_columns]
+        tableau["Name"] = reviews["Name"]
+        tableau["Overall Rating"] = reviews["Overall Rating"]
         reviews.drop(existing_columns, axis=1, inplace=True)
     # Mostrar el DataFrame después de eliminar las columnas
     print("The shape of the  data is (row, column):" + str(reviews.shape))
@@ -314,22 +324,23 @@ def main():
             else:
                 print(f"Información no encontrada para la ciudad: {city}")
 
-        # Crear DataFrames para cada diccionario
-        df_country = pd.DataFrame(list(city_country_dict.items()), columns=['City', 'Country'])
-        df_continent = pd.DataFrame(list(city_cont_dict.items()), columns=['City', 'Continent'])
-        df_latitude = pd.DataFrame(list(city_lat_dict.items()), columns=['City', 'Latitude'])
-        df_longitude = pd.DataFrame(list(city_long_dict.items()), columns=['City', 'Longitude'])
+            # Crear DataFrames para cada diccionario
+            df_country = pd.DataFrame(list(city_country_dict.items()), columns=['City', 'Country'])
+            df_continent = pd.DataFrame(list(city_cont_dict.items()), columns=['City', 'Continent'])
+            df_latitude = pd.DataFrame(list(city_lat_dict.items()), columns=['City', 'Latitude'])
+            df_longitude = pd.DataFrame(list(city_long_dict.items()), columns=['City', 'Longitude'])
 
-        # Exportar a archivos CSV
-        df_country.to_csv("city_country.csv", index=False)
-        df_continent.to_csv("city_continent.csv", index=False)
-        df_latitude.to_csv("city_latitude.csv", index=False)
-        df_longitude.to_csv("city_longitude.csv", index=False)
+            # Exportar a archivos CSV
+            df_country.to_csv("city_country.csv", index=False)
+            df_continent.to_csv("city_continent.csv", index=False)
+            df_latitude.to_csv("city_latitude.csv", index=False)
+            df_longitude.to_csv("city_longitude.csv", index=False)
     else:
         city_country_dict = csv_to_dict("city_country.csv")
         city_cont_dict = csv_to_dict("city_continent.csv")
         city_lat_dict = csv_to_dict("city_latitude.csv")
         city_long_dict = csv_to_dict("city_longitude.csv")
+
 
     # Agregar columnas al DataFrame usando apply y lambda
     reviews["Or_country"] = reviews["Origin"].apply(lambda city: g_att_str(city_country_dict, city))
@@ -395,40 +406,39 @@ def main():
 
     ################### PROCESAR TEXTO #######################
 
-    if TEXTO == "True":
-        # Simplificar texto según función clean_review
-        reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
-        print(reviews.head())
+    #if TEXTO == "True":
+    # Simplificar texto según función clean_review
+    reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
+    print(reviews.head())
 
-        # Quitar stop words
-        reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(
-            lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
-        print(reviews.head())
+    # Quitar stop words
+    reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(
+        lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
+    print(reviews.head())
 
-        # Contador de palabras
-        cnt = Counter()
-        for text in reviews["Reviews_Simp"].values:
-            for word in text.split():
-                cnt[word] += 1
+    # Contador de palabras
+    cnt = Counter()
+    for text in reviews["Reviews_Simp"].values:
+        for word in text.split():
+            cnt[word] += 1
 
-        print(cnt.most_common(10))
+    print(cnt.most_common(10))
 
-        # Stem words: LOS RESULTADOS EMPEORAN
+    # Stem words: LOS RESULTADOS EMPEORAN
 
-        #reviews["Reviews_Simp"] = reviews["Reviews_Simp"].apply(lambda text: stem_words(text))
-        #print(reviews.head())
+    #reviews["Reviews_Simp"] = reviews["Reviews_Simp"].apply(lambda text: stem_words(text))
+    #print(reviews.head())
 
-        #PROCESAMIENTO DE EMOTICONOS -> CONVERTIR A TEXTO
-        #https://www.kaggle.com/code/sudalairajkumar/getting-started-with-text-preprocessing
+    #PROCESAMIENTO DE EMOTICONOS -> CONVERTIR A TEXTO
+    #https://www.kaggle.com/code/sudalairajkumar/getting-started-with-text-preprocessing
 
-        # DATOS EXTRAÍDOS:
-        reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
-        reviews['review_len'] = reviews['Reviews_Simp'].astype(str).apply(len)
-        reviews['word_count'] = reviews['Reviews_Simp'].apply(lambda x: len(str(x).split()))
-        print(reviews.head())
+    # DATOS EXTRAÍDOS:
+    reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
+    reviews['review_len'] = reviews['Reviews_Simp'].astype(str).apply(len)
+    reviews['word_count'] = reviews['Reviews_Simp'].apply(lambda x: len(str(x).split()))
+    print(reviews.head())
 
     #################### FEATURES ##############################3
-
     # calling the label encoder function
     le = preprocessing.LabelEncoder()
 
@@ -459,7 +469,7 @@ def main():
     else:
         columns = ["Origin", "Destiny", "Scale", "Verified",
                    "Type of Traveller", "Class", "Scale_bool", "year", "month", "day", "Or_country", "Dst_country",
-                   "Or_lat", "Dst_lat", "Dst_long", "Or_long", "distance_km"]
+                   "Or_lat", "Dst_lat", "Dst_long", "Or_long", "distance_km", "polarity", "review_len", "word_count"]
         # columns = ["Reviews_Simp", "Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
         #           "Type of Traveller", "Class", "Scale_bool"]
         review_features = review_features[columns].reset_index(drop=True)
@@ -495,6 +505,7 @@ def main():
         #LAS MEJORES PARA KNN:
         numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified","Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
     "Or_lat", "Dst_lat", "Or_long", "Dst_long", "month", "day"]]
+
         scaler = StandardScaler()
         num_sc = scaler.fit_transform(numerical_ft)
         # importancia de features:
@@ -609,7 +620,26 @@ def main():
         # cv = cross-validation. Se divide train en 5 trozos; se utilizan 4/5 para train, 1/5 para dev. Se dan
         # 5 vueltas. De esta manera se evita el overfitting.
 
-        clf = GridSearchCV(model, params, cv=5, scoring=make_scorer(f1_score, average='weighted'), verbose=0, n_jobs=-1)
+        #scoring => ¿según qué métrica se decide el mejor modelo? Por defecto: fscore
+
+        #CLASES GENERALES:
+        precision_weighted_scorer = make_scorer(precision_score, average='weighted', zero_division=0)
+        accuracy_scorer = make_scorer(accuracy_score)
+        recall_weighted_scorer = make_scorer(recall_score, average='weighted', zero_division=0)
+
+        if METRICA == "fscore":
+            scorer = make_scorer(f1_score, average='weighted')
+        elif METRICA == "accuracy":
+            scorer = accuracy_scorer
+        elif METRICA == "precision":
+            scorer = precision_weighted_scorer
+        elif METRICA == "recall":
+            scorer = recall_weighted_scorer
+
+        #CLASES ESPECÍFICAS: POSITIVA, NEUTRA, NEGATIVA:
+        ### POR HACER!
+
+        clf = GridSearchCV(model, params, cv=5, scoring=scorer, verbose=0, n_jobs=-1)
         best_model = clf.fit(X_train, y_train)
         best_models.append(best_model.best_estimator_)
 
@@ -659,7 +689,8 @@ def main():
         print()
 
     final_results_df = pd.concat(cv_results_dfs, ignore_index=True)
-
+    tableau_merged = pd.concat([tableau, reviews], axis=1)
+    tableau_merged.to_csv("datos_tableau.csv", index=False)
     # Guardar en un archivo CSV
     final_results_df.to_csv('final_results.csv', index=False)
 
@@ -694,8 +725,8 @@ def main():
 if __name__ == '__main__':
     print('ARGV   :', sys.argv[1:])
     try:
-        options, reminder = getopt.getopt(sys.argv[1:], 'i:o:t:s:h',
-                                          ['input=', 'output=', 'help', 'text=', 'oversampling='])
+        options, reminder = getopt.getopt(sys.argv[1:], 'i:o:t:s:m:h',
+                                          ['input=', 'output=', 'help', 'text=', 'oversampling=', 'metric='])
 
     except getopt.GetoptError as err:
         print('ERROR:', err)
