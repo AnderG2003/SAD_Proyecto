@@ -12,6 +12,14 @@ Eneko Uresandi
 
 Ander Gorocica
 
+##Llamada:
+python sentiMenu.py -i INPUT_FILE -o OUT_DIR -s smote/adasyn -t True/False
+
+(-t -> ¿Se utiliza el texto para entrenar?)
+(-s -> TÉCNICA DE OVERSAMPLING)
+(-o -> Carpeta donde se guardan los modelos, debe existir)
+(-i -> archivo a analizar)
+
 ## Sentiment Analysis
 To-do:
 - [x] Preproceso
