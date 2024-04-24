@@ -457,7 +457,7 @@ def main():
         X = tfidf_reviews
         print(X.shape)
     else:
-        columns = ["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+        columns = ["Origin", "Destiny", "Scale", "Verified",
                    "Type of Traveller", "Class", "Scale_bool", "year", "month", "day", "Or_country", "Dst_country",
                    "Or_lat", "Dst_lat", "Dst_long", "Or_long", "distance_km"]
         # columns = ["Reviews_Simp", "Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
@@ -480,22 +480,21 @@ def main():
         print(review_features.head())
 
         # Numerical:
-        # numerical_ft = review_features[["Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
+        #numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
         #  "Type of Traveller", "Class", "Scale_bool"]]
 
-        numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-                                        "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
-                                        "month", "day", "Or_lat", "Dst_lat", "Or_long", "Dst_long", "distance_km"]]
+        #numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+                                     #   "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
+                                      #  "month", "day", "Or_lat", "Dst_lat", "Or_long", "Dst_long", "distance_km"]]
 
         # LAS MEJORES PARA SVC:
-        # numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-        #                            "Type of Traveller", "Scale_bool", "Or_country", "Dst_country", "year", "Class", "day",
-        #                         "distance_km", "month"]]
+        #numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+         #                           "Type of Traveller", "Scale_bool", "Or_country", "Dst_country", "year", "Class", "day",
+         #                        "distance_km", "month"]]
 
-        # LAS MEJORES PARA KNN:
-        # numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-        #                                "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
-        #                                "Or_lat", "Dst_lat", "Or_long", "Dst_long", "month", "day"]]
+        #LAS MEJORES PARA KNN:
+        numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified","Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
+    "Or_lat", "Dst_lat", "Or_long", "Dst_long", "month", "day"]]
         scaler = StandardScaler()
         num_sc = scaler.fit_transform(numerical_ft)
         # importancia de features:
@@ -695,7 +694,7 @@ def main():
 if __name__ == '__main__':
     print('ARGV   :', sys.argv[1:])
     try:
-        options, reminder = getopt.getopt(sys.argv[1:], 'i:o:h:t:s',
+        options, reminder = getopt.getopt(sys.argv[1:], 'i:o:t:s:h',
                                           ['input=', 'output=', 'help', 'text=', 'oversampling='])
 
     except getopt.GetoptError as err:
