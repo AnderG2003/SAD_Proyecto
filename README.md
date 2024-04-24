@@ -13,7 +13,7 @@ Eneko Uresandi
 Ander Gorocica
 
 ##Llamada:
-python sentiMenu.py -i INPUT_FILE -o OUT_DIR -s smote/adasyn -t True/False
+ > python sentiMenu.py -i INPUT_FILE -o OUT_DIR -s smote/adasyn -t True/False
 
 (-t -> ¿Se utiliza el texto para entrenar?)
 (-s -> TÉCNICA DE OVERSAMPLING)
