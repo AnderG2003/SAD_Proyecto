@@ -12,13 +12,28 @@ Eneko Uresandi
 
 Ander Gorocica
 
-##Llamada:
- > python sentiMenu.py -i INPUT_FILE -o OUT_DIR -s smote/adasyn -t True/False
-
-(-t -> ¿Se utiliza el texto para entrenar?)
-(-s -> TÉCNICA DE OVERSAMPLING)
+## Llamada Sentimen Analysis:
+#### Opciones:
+```
+(-t -> ¿Se utiliza el texto para entrenar? True / False)
+(-s -> TÉCNICA DE OVERSAMPLING: smote / adasyn)
 (-o -> Carpeta donde se guardan los modelos, debe existir)
 (-i -> archivo a analizar)
+(-m -> la métrica según la cual se juzgará el mejor modelo: fscore / precision /accuracy / recall)
+```
+#### Ejemplo:
+```console
+foo@bar:~$  python sentiMenu.py -i sing_entero.csv -o ModelosTexto -s smote -t True -m fscore 
+```
+#### Para texto:
+```console
+foo@bar:~$  python sentiMenu.py -i sing_entero.csv -o ModelosTexto -s smote -t True -m fscore 
+```
+
+#### Sin texto:
+```console
+foo@bar:~$  python sentiMenu.py -i sing_entero.csv -o ModelosTexto -s smote -t False -m fscore 
+```
 
 ## Sentiment Analysis
 To-do:
@@ -40,12 +55,12 @@ To-do:
   - [x] SVC
   - [x] Random Forest
   - [x] Decision Trees
-- [ ] Hacer el código llamable
-  - [ ] -i input
-  - [ ] -o output
-  - [ ] etc
-- [ ] Guardar los mejores modelos con pickle
-- [ ] Separar los dos clasificadores
+- [x] Hacer el código llamable
+  - [x] -i input
+  - [x] -o output
+  - [x] etc
+- [x] Guardar los mejores modelos con pickle
+- [x] Separar los dos clasificadores
 
 ## Resultados (21-04-2024)
 ![Logistic Regression](/images/lr.png)
