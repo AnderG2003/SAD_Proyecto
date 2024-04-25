@@ -26,11 +26,32 @@ from sklearn.model_selection import GridSearchCV
 import logging
 from gensim.corpora import Dictionary
 from gensim.models import LdaModel
-from nltk.tokenize import RegexpTokenizer
-from nltk.stem.wordnet import WordNetLemmatizer
-from gensim.models import Phrases
-from gensim.models import CoherenceModel
+#from nltk.tokenize import RegexpTokenizer
+#from nltk.stem.wordnet import WordNetLemmatizer
+#from gensim.models import Phrases
+#from gensim.models import CoherenceModel
 
+def display_topics(H, W, feature_names, documents, no_top_words, no_top_documents, og):
+    for topic_idx, topic in enumerate(H):
+        print("Topic %d:" % (topic_idx))
+        print(''.join([' ' +feature_names[i] + ' ' + str(round(topic[i], 5)) #y esto también
+                for i in topic.argsort()[:-no_top_words - 1:-1]]))
+        top_doc_indices = np.argsort( W[:,topic_idx] )[::-1][0:no_top_documents]
+        docProbArray=np.argsort(W[:,topic_idx])
+    #    print(docProbArray)
+   #     howMany=len(docProbArray);
+    #    print("How Many");
+    #    print(howMany);
+        for doc_index in top_doc_indices:
+            print("* " + og[doc_index])
+            
+def generate_cluster_names(H, W, feature_names, documents, no_top_words, no_top_documents, og):
+    cluster_names = []
+    for topic_idx, topic in enumerate(H):
+        top_words = [feature_names[i] for i in topic.argsort()[:-no_top_words - 1:-1]]
+        cluster_name = " ".join(top_words)
+        cluster_names.append(cluster_name)
+    return cluster_names
 
 # LLAMADA POR TERMINAL: python clustering.py nombreDeCSV numTopics
 if __name__ == '__main__':
@@ -52,7 +73,9 @@ if __name__ == '__main__':
     nombreTop = ["","","","","","","","","",""]
     nombreDatos = sys.argv[1]
     numTopicos = int(sys.argv[2])
-    sentimiento = sys.argv[3]   ## CONSULTAR CON SENTIMENTANALYSIS (0 = negativo, 1 = neutral, 2 = positivo)
+    sentimiento = int(sys.argv[3])   ## CONSULTAR CON SENTIMENTANALYSIS (0 = negativo, 1 = neutral, 2 = positivo)
+
+    print("Los parametros que se han indicado son:\n numTopicos: ", numTopicos, "\n sentimiento: ", sentimiento)
 
     if numTopicos > 10:
         print("No es posible realizar una ejecución con tantos tópicos.\nRepita la prueba con un número menor por favor.\n")
@@ -63,23 +86,65 @@ if __name__ == '__main__':
 
     # Cargar los datos del .csv
     ml_dataset = pd.read_csv(nombreDatos, header=0)
-    ml_dataset = ml_dataset[~ml_dataset['content'].isnull()]
+    #ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
 
     # FUTUROS FILTRADOS DE DATOS AQUÍ
     '''
     # Solo tener en cuenta las valoraciones con sentimiento concreto
     ml_dataset = ml_dataset[ml_dataset["NOMBRECOLUMNA"] == sentimiento]]  ## CONSULTAR CON SENTIMENTANALYSIS
     '''
-
+    # Filtrar las reseñas según el sentimiento
+    '''
+    if sentimiento == 2:
+        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 2]['Reviews_Simp']
+    elif sentimiento == 0:
+        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 0]['Reviews_Simp']
+    elif sentimiento == 1:
+        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 1]['Reviews_Simp']
+    else:
+        raise ValueError("Sentimiento debe ser 2 = 'positivas', 0 = 'negativas' o 1 = 'neutras'.")
+    '''
+    ml_dataset = ml_dataset[ml_dataset['Sentiment'] == sentimiento]
     copia = ml_dataset
     
     # Trabajamos con los textos de las reviews
-    documentos = ml_dataset["content"]#.toList()
+    #documentos = ml_dataset["Reviews_Simp"].toList()
+    documentos = ml_dataset['Reviews_Simp'].tolist()
 
     # Nos aseguramos de que está todo en minusculas
     for i in range(0, len(documentos)):
         documentos[i] = documentos[i].lower()
 
+    ### PRUEBA 
+    documentos = [d.split() for d in documentos]
+
+    # Quitar palabras que son solo números
+    documentos = [[token for token in doc if not token.isnumeric()] for doc in documentos]
+    
+    # Quitar palabras que pertenecen al stopWords
+    documentos = [[token for token in doc if not token in stop_words] for doc in documentos]
+
+    # Quitar palabras de un caracter
+    documentos = [[token for token in doc if len(token) > 1] for doc in documentos]
+
+    # Crear diccionario
+    dictionary = Dictionary(documentos)
+
+    # Filtrar palabras que aparezcan menos de X veces, o más del 5% de los documentos
+    dictionary.filter_extremes(no_below=20, no_above=0.05)
+    corpus = [dictionary.doc2bow(doc) for doc in documentos]
+
+    temp = dictionary[0] 
+    id2word = dictionary.id2token
+
+    num_topics = numTopicos
+    chunksize = 2000
+    passes = 10
+    iterations = 500
+ 
+
+    #######################################################################
+    '''
     # Por cada review, creamos una lista con las palabras de la review
     documentosAux = []
     for docuAct in documentos:
@@ -122,11 +187,11 @@ if __name__ == '__main__':
 
 
     '''
-    bigrama = Phrases(documentos, min_count=20)
-    for ind in range(len(documentos)):
-        for token in bigrama[documentos[ind]]:
-            if '_' in token:
-                documentos[ind].append(token)
+    #bigrama = Phrases(documentos, min_count=20)
+    #for ind in range(len(documentos)):
+    #    for token in bigrama[documentos[ind]]:
+    #        if '_' in token:
+    #            documentos[ind].append(token)
     '''
 
     # Creamos un diccionario con los documentos
@@ -140,6 +205,7 @@ if __name__ == '__main__':
     for docuAct in documentos:
         documentosAux5.append(diccionario.doc2bow(docuAct))
 
+    
     corpus = documentosAux5
     id2word = diccionario.id2token
     num_topics = numTopicos
@@ -147,7 +213,10 @@ if __name__ == '__main__':
     passes = 10
     iterations = 500
     #eval_every = 10
+    '''
+    #############################################################################3
 
+    
     # Creamos el modelo usando LDA
     modelo = LdaModel(
         corpus=corpus,
@@ -205,4 +274,4 @@ if __name__ == '__main__':
     print(lis)
 
     copia["razón negativa"] = np.array(arrayTop).tolist()
-    copia.to_csv("archivo.csv")
+    copia.to_csv("output.csv")
