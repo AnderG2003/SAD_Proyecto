@@ -70,10 +70,13 @@ if __name__ == '__main__':
               'singapore',
               'airlines', 'airline', 'turkish']
 
-    nombreTop = ["","","","","","","","","",""]
+    #nombreTop = ["","","","","","","","","",""]
     nombreDatos = sys.argv[1]
     numTopicos = int(sys.argv[2])
     sentimiento = int(sys.argv[3])   ## CONSULTAR CON SENTIMENTANALYSIS (0 = negativo, 1 = neutral, 2 = positivo)
+
+    nombreTop = [""] * numTopicos
+    #print("@@@@@@@@@@@@@@@@@@@@@@@@@@: ", nombreTop)
 
     print("Los parametros que se han indicado son:\n numTopicos: ", numTopicos, "\n sentimiento: ", sentimiento)
 
@@ -96,16 +99,17 @@ if __name__ == '__main__':
     # Filtrar las reseñas según el sentimiento
     '''
     if sentimiento == 2:
-        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 2]['Reviews_Simp']
+        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 2]
     elif sentimiento == 0:
-        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 0]['Reviews_Simp']
+        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 0]
     elif sentimiento == 1:
-        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 1]['Reviews_Simp']
+        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 1]
     else:
         raise ValueError("Sentimiento debe ser 2 = 'positivas', 0 = 'negativas' o 1 = 'neutras'.")
     '''
     ml_dataset = ml_dataset[ml_dataset['Sentiment'] == sentimiento]
     copia = ml_dataset
+    print("Cuantos Documentos van a analizarse: ", len(ml_dataset))
     
     # Trabajamos con los textos de las reviews
     #documentos = ml_dataset["Reviews_Simp"].toList()
