@@ -133,16 +133,25 @@ if __name__ == '__main__':
 
     # Crear diccionario
     dictionary = Dictionary(documentos)
-
+    
     # Filtrar palabras que aparezcan menos de X veces, o más del 5% de los documentos
-    dictionary.filter_extremes(no_below=20, no_above=0.05)
+    # Sentimiento: 0 -> 244 docs
+    #              1 -> 93 docs
+    #              2 -> 462 docs
+    if sentimiento==0:
+        dictionary.filter_extremes(no_below=5, no_above=0.2)
+    elif sentimiento==1:
+        dictionary.filter_extremes(no_below=5, no_above=0.2)
+    elif sentimiento==2: 
+        dictionary.filter_extremes(no_below=20, no_above=0.05)
+    
     corpus = [dictionary.doc2bow(doc) for doc in documentos]
 
     temp = dictionary[0] 
     id2word = dictionary.id2token
 
     num_topics = numTopicos
-    chunksize = 2000
+    chunksize = 1000
     passes = 10
     iterations = 500
  
@@ -226,8 +235,8 @@ if __name__ == '__main__':
         corpus=corpus,
         id2word=id2word,
         chunksize=chunksize,
-        alpha='auto',
-        eta='auto',
+        alpha=1/num_topics,
+        eta=1/num_topics,
         iterations=iterations,
         num_topics=num_topics,
         passes=passes,
