@@ -1,5 +1,6 @@
 import getopt
-import sys
+from sys import exit, argv, version_info
+import os
 import numpy as np
 import pandas as pd
 import sklearn as sk
@@ -28,8 +29,90 @@ from gensim.corpora import Dictionary
 from gensim.models import LdaModel
 #from nltk.tokenize import RegexpTokenizer
 #from nltk.stem.wordnet import WordNetLemmatizer
-#from gensim.models import Phrases
+from gensim.models import Phrases
 #from gensim.models import CoherenceModel
+
+
+# VARIABLES GLOBALES
+INPUT_PATH  =   "./datos/archivo.csv"           # Path de los archivos de entrada
+OUTPUT_PATH =   "./modelos"                     # Path de los archivos de salida
+TARGET_COL  =   "Sentiment"                     # Nombre de la columna a clasificar
+SENTIMIENTO =   2                               # Sentimiento a filtrar (0 = Negativo, 1 = Neutro, 2 = Positivo)
+SAMPLING    =   "NO"                            # Metodo de muestreo del dataset (NO, UNDERSAMPLING, OVERSAMPLING)
+ATRIBUTOS   =   ['Reviews_Simp']                # Atributos que seleccionamos del dataset (TODOS o lista)
+AEROLINEA   =   "Singapore Airlines"            # Aerolinea de la que miraremos los datos
+
+###########################################################
+#               CONFIGURACIONES                           #
+###########################################################
+def usage():
+    print("Uso: python clustering.py <opciones>")
+    print("Las posibles opciones son")
+    print(f"-h, --help          muestar el uso")
+    print(f"-i, --input         path de los archivos de entrada                 DEFAULT: ./{INPUT_PATH}")
+    print(f"-o, --output        path de los archivos de salida                  DEFAULT: ./{OUTPUT_PATH}")
+    print(f"-t, --target        nombre objetivo a predecir                      DEFAULT: {TARGET_COL}")
+    print(f"-s, --sentiment     sentimiento a filtrar                           DEFAULT: {SENTIMIENTO}")
+    print(f"-a, --airline       filtro de aerolinea                             DEFAULT: {AEROLINEA}")
+    print(f"-m                  estrategia de muestreo                          DEFAULT: {SAMPLING}")
+    
+    exit(1)
+
+def load_options(options):
+    global INPUT_PATH, OUTPUT_PATH, TARGET_COL, SENTIMIENTO, SAMPLING
+
+    for opt, arg in options:
+        if opt in ('-h', '--help'):
+            usage()
+        elif opt in ('-i', '--input'):
+            INPUT_PATH = str(arg)
+        elif opt in ('-o', '--output'):
+            OUTPUT_PATH = str(arg)    
+        elif opt in ('-t', '--target'):
+            TARGET_COL = str(arg)
+        elif opt in ('-s','--sentimiento'):
+            SENTIMIENTO = str(arg)
+        elif opt in ('-m'):
+            SAMPLING = str(arg)
+        elif opt in ('-a','--airline'):
+            AEROLINEA = str(arg)
+
+def show_script_options():
+    print("clustering.py configuraciones:")
+    print(f"-i                   path de los archivos de entrada:       {INPUT_PATH}")
+    print(f"-o                   path de los archivos de salida:        {OUTPUT_PATH}")
+    print(f"-t                   nombre objetivo a predecir:            {TARGET_COL}")
+    print(f"-s                   sentimiento a filtrar:                 {SENTIMIENTO}")
+    print(f"-a                   aerolinea a filtrar:                   {AEROLINEA}")
+    print(f"-m                   estrategia de muestreo:                {SAMPLING}")
+    print(f"                     atributos seleccionados:               {ATRIBUTOS}")
+
+
+###########################################################
+#               METODOS                                   #
+###########################################################
+def coerce_to_unicode(x):
+    if version_info < (3, 0):
+        if isinstance(x, str):
+            return unicode(x, 'utf-8')
+        else:
+            return unicode(x)
+    return str(x)
+
+def crear_path_salida():
+    if not os.path.isdir(OUTPUT_PATH):
+        os.mkdir(OUTPUT_PATH)
+
+    for archivo in os.listdir(OUTPUT_PATH):
+        path = os.path.join(OUTPUT_PATH, archivo)
+        try:
+            if os.path.isfile(path) or os.path.islink(path):
+                os.unlink(path)
+            elif os.path.isdir(path):
+                shutil.rmtree(path)
+        except Exception as e:
+            print('No se ha podido eliminar algun archivo de la carpeta de salida')
+
 
 def display_topics(H, W, feature_names, documents, no_top_words, no_top_documents, og):
     for topic_idx, topic in enumerate(H):
@@ -54,6 +137,23 @@ def generate_cluster_names(H, W, feature_names, documents, no_top_words, no_top_
     return cluster_names
 
 # LLAMADA POR TERMINAL: python clustering.py nombreDeCSV numTopics
+def main():
+    print("Ejecución principal iniciando")
+    crear_path_salida()
+
+    ml_dataset = pd.read_csv(INPUT_PATH)
+    if ATRIBUTOS == "TODOS":
+        atr = ml_dataset.columns
+    else:
+        atr = ATRIBUTOS
+
+    ml_dataset = ml_dataset[atr]
+
+    # Filtros seleccionados
+    ml_dataset = ml_dataset[ml_dataset['airline'] == AEROLINEA]
+    ml_dataset = ml_dataset[ml_dataset['airline_sentiment'] == SENTIMIENTO]
+
+
 if __name__ == '__main__':
 
     stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
@@ -200,11 +300,11 @@ if __name__ == '__main__':
 
 
     '''
-    #bigrama = Phrases(documentos, min_count=20)
-    #for ind in range(len(documentos)):
-    #    for token in bigrama[documentos[ind]]:
-    #        if '_' in token:
-    #            documentos[ind].append(token)
+    bigrama = Phrases(documentos, min_count=20)
+    for ind in range(len(documentos)):
+        for token in bigrama[documentos[ind]]:
+            if '_' in token:
+                documentos[ind].append(token)
     '''
 
     # Creamos un diccionario con los documentos
