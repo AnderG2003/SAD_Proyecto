@@ -7,8 +7,12 @@ import sys
 # Ignore warnings
 import warnings
 
+from nltk import RegexpTokenizer
 # NLTK libraries
 from nltk.stem.porter import PorterStemmer
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 # Visualization libraries
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,7 +28,7 @@ from sklearn.metrics import classification_report, precision_recall_fscore_suppo
     f1_score, recall_score, precision_score, accuracy_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
-from sklearn.naive_bayes import BernoulliNB
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier
 # Machine Learning libraries
 from sklearn.preprocessing import StandardScaler
@@ -44,6 +48,9 @@ from scipy.stats import pearsonr
 from collections import Counter
 
 stemmer = PorterStemmer()
+lemmatizer = WordNetLemmatizer()
+pattern = r'\b[^\d\W]+\b'  # Tokenizer pattern para palabras (sin dígitos ni símbolos)
+tokenizer = RegexpTokenizer(pattern)
 
 INPUT_FILE = "airlines_reviewsSingapore.csv"
 OUT_FILE = "Modelos"
@@ -74,11 +81,11 @@ corrections_dict = {
     "Singapoe": "Singapore",
     "Sinhapore": "Singapore",
     "Qingdoa": "Qingdao",
-    #  "MEL": "Melbourne",
-    #  "SIN": "Singapore",
-    #  "HND": "Tokyo",
-    #  " New York": "New York",
-    #  "New York JFK": "New York"
+    "MEL": "Melbourne",
+    "SIN": "Singapore",
+    "HND": "Tokyo",
+    " New York": "New York",
+    "New York JFK": "New York"
 }
 
 
@@ -174,6 +181,13 @@ def clean_review(text):
     return text
 
 
+def process_review(review):
+    tokens = word_tokenize(str(review).lower())  # Tokenizar y convertir a minúsculas
+    stopped_tokens = [t for t in tokens if t not in stop_words]  # Filtrar stopwords
+    lemma_tokens = [lemmatizer.lemmatize(t) for t in stopped_tokens]  # Lematizar
+    lemma_tokens = [t for t in lemma_tokens if len(t) > 1]  # Eliminar caracteres individuales
+    return lemma_tokens
+
 def read_country(city):
     """
     Convert cities and returns the country
@@ -247,8 +261,8 @@ def csv_to_dict(file):
     return data_dict
 
 
-def stem_words(text):
-    return " ".join([stemmer.stem(word) for word in text.split()])
+def lemm_words(text):
+    return " ".join([lemmatizer.lemmatize(word) for word in text.split()])
 
 ############### MAIN #################
 
@@ -375,6 +389,7 @@ def main():
     num_duplicates = reviews.duplicated().sum()  # identify duplicates
     print('There are {} duplicate reviews present in the dataset'.format(num_duplicates))
 
+    # JUNTAR TITLE Y REVIEW
     reviews['Rev'] = reviews['Reviews'] + reviews['Title']
     reviews = reviews.drop(['Reviews', 'Title'], axis=1)
     print(reviews.head())
@@ -406,37 +421,38 @@ def main():
 
     ################### PROCESAR TEXTO #######################
 
-    #if TEXTO == "True":
-    # Simplificar texto según función clean_review
-    reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
-    print(reviews.head())
+    if TEXTO == "True":
+        # Simplificar texto según función clean_review
+        reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
+        #reviews['Reviews_Tok'] = reviews["Rev"].apply(lambda x: process_review(x))
+        print(reviews.head())
 
-    # Quitar stop words
-    reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(
-        lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
-    print(reviews.head())
+        # Quitar stop words
+        reviews['Reviews_Simp'] = reviews['Reviews_Simp'].apply(
+            lambda x: ' '.join([word for word in x.split() if word not in (stop_words)]))
+        print(reviews.head())
 
-    # Contador de palabras
-    cnt = Counter()
-    for text in reviews["Reviews_Simp"].values:
-        for word in text.split():
-            cnt[word] += 1
+        # Contador de palabras
+        cnt = Counter()
+        for text in reviews["Reviews_Simp"].values:
+            for word in text.split():
+                cnt[word] += 1
 
-    print(cnt.most_common(10))
+        print(cnt.most_common(10))
 
-    # Stem words: LOS RESULTADOS EMPEORAN
+        # Stem words: LOS RESULTADOS EMPEORAN
 
-    #reviews["Reviews_Simp"] = reviews["Reviews_Simp"].apply(lambda text: stem_words(text))
-    #print(reviews.head())
+        reviews["Reviews_Simp"] = reviews["Reviews_Simp"].apply(lambda text: lemm_words(text))
+        print(reviews.head())
 
-    #PROCESAMIENTO DE EMOTICONOS -> CONVERTIR A TEXTO
-    #https://www.kaggle.com/code/sudalairajkumar/getting-started-with-text-preprocessing
+        #PROCESAMIENTO DE EMOTICONOS -> CONVERTIR A TEXTO
+        #https://www.kaggle.com/code/sudalairajkumar/getting-started-with-text-preprocessing
 
-    # DATOS EXTRAÍDOS:
-    reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
-    reviews['review_len'] = reviews['Reviews_Simp'].astype(str).apply(len)
-    reviews['word_count'] = reviews['Reviews_Simp'].apply(lambda x: len(str(x).split()))
-    print(reviews.head())
+        # DATOS EXTRAÍDOS:
+        reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
+        reviews['review_len'] = reviews['Reviews_Simp'].astype(str).apply(len)
+        reviews['word_count'] = reviews['Reviews_Simp'].apply(lambda x: len(str(x).split()))
+        print(reviews.head())
 
     #################### FEATURES ##############################3
     # calling the label encoder function
@@ -465,6 +481,7 @@ def main():
         # TF-IDF feature matrix
         tfidf_reviews = tfidf_vectorizer.fit_transform(review_features['Reviews_Simp'])
         X = tfidf_reviews
+
         print(X.shape)
     else:
         columns = ["Origin", "Destiny", "Scale", "Verified",
@@ -560,7 +577,7 @@ def main():
     dt = DecisionTreeClassifier()
     knn = KNeighborsClassifier()
     svc = SVC()
-    nb = BernoulliNB()
+    nb = MultinomialNB()
     rf = RandomForestClassifier()
     cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2: 'KNN', 3: 'SVC', 4: 'Naive Bayes', 5: 'Random Forest'}
     cv_models = [logreg, dt, knn, svc, nb, rf]
@@ -643,6 +660,11 @@ def main():
         best_model = clf.fit(X_train, y_train)
         best_models.append(best_model.best_estimator_)
 
+        # También puedes mostrar información adicional como el informe de clasificación
+        y_pred = best_model.predict(X_test)
+        print("Classification Report para el mejor modelo:")
+        print(classification_report(y_test, y_pred))
+
         print("{} Best Parameters: {}".format(cv_dict[i], best_model.best_params_))
         print("{} Test Accuracy: {:.2f}".format(cv_dict[i], best_model.best_score_))
 
@@ -660,6 +682,19 @@ def main():
         })
 
         cv_results = pd.DataFrame(clf.cv_results_)
+        cv_results_sorted = cv_results.sort_values(by='mean_test_score', ascending=False)
+        top_3_results = cv_results_sorted.head(3)
+
+        # Imprimir información de los tres mejores resultados
+        print(f"{cv_dict[i]} - Los 3 mejores resultados:")
+        for idx, row in top_3_results.iterrows():
+            print(" - Mejor Score: {:.2f}".format(row['mean_test_score']))
+            print(" - Parámetros: {}".format(row['params']))
+            try:
+                print(" - F-score: {:.2f}".format(row['mean_test_score']))
+            except KeyError:
+                print(" - F-score no disponible")
+
         for j in range(len(cv_results)):
             y_pred = best_model.predict(X_test)  # Pr
             precision, recall, fscore, _ = precision_recall_fscore_support(y_test, y_pred, average='macro')
