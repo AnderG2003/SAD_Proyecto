@@ -30,17 +30,17 @@ from gensim.models import LdaModel
 #from nltk.tokenize import RegexpTokenizer
 #from nltk.stem.wordnet import WordNetLemmatizer
 from gensim.models import Phrases
-#from gensim.models import CoherenceModel
+from gensim.models import CoherenceModel
 
 
 # VARIABLES GLOBALES
 INPUT_PATH  =   "./datos/archivo.csv"           # Path de los archivos de entrada
 OUTPUT_PATH =   "./modelos"                     # Path de los archivos de salida
 TARGET_COL  =   "Sentiment"                     # Nombre de la columna a clasificar
-SENTIMIENTO =   2                               # Sentimiento a filtrar (0 = Negativo, 1 = Neutro, 2 = Positivo)
+SENTIMIENTO =   1                               # Sentimiento a filtrar (0 = Negativo, 1 = Neutro, 2 = Positivo)
 SAMPLING    =   "NO"                            # Metodo de muestreo del dataset (NO, UNDERSAMPLING, OVERSAMPLING)
 ATRIBUTOS   =   ['Reviews_Simp']                # Atributos que seleccionamos del dataset (TODOS o lista)
-AEROLINEA   =   "Singapore Airlines"            # Aerolinea de la que miraremos los datos
+#AEROLINEA   =   "Singapore Airlines"           # Aerolinea de la que miraremos los datos
 
 ###########################################################
 #               CONFIGURACIONES                           #
@@ -53,12 +53,12 @@ def usage():
     print(f"-o, --output        path de los archivos de salida                  DEFAULT: ./{OUTPUT_PATH}")
     print(f"-t, --target        nombre objetivo a predecir                      DEFAULT: {TARGET_COL}")
     print(f"-s, --sentiment     sentimiento a filtrar                           DEFAULT: {SENTIMIENTO}")
-    print(f"-a, --airline       filtro de aerolinea                             DEFAULT: {AEROLINEA}")
+    #print(f"-a, --airline       filtro de aerolinea                             DEFAULT: {AEROLINEA}")
     print(f"-m                  estrategia de muestreo                          DEFAULT: {SAMPLING}")
     
     exit(1)
 
-def load_options(options):
+def cargar_opciones(options):
     global INPUT_PATH, OUTPUT_PATH, TARGET_COL, SENTIMIENTO, SAMPLING
 
     for opt, arg in options:
@@ -74,16 +74,16 @@ def load_options(options):
             SENTIMIENTO = str(arg)
         elif opt in ('-m'):
             SAMPLING = str(arg)
-        elif opt in ('-a','--airline'):
-            AEROLINEA = str(arg)
+        #elif opt in ('-a','--airline'):
+        #    AEROLINEA = str(arg)
 
-def show_script_options():
+def mostrar_opciones():
     print("clustering.py configuraciones:")
     print(f"-i                   path de los archivos de entrada:       {INPUT_PATH}")
     print(f"-o                   path de los archivos de salida:        {OUTPUT_PATH}")
     print(f"-t                   nombre objetivo a predecir:            {TARGET_COL}")
     print(f"-s                   sentimiento a filtrar:                 {SENTIMIENTO}")
-    print(f"-a                   aerolinea a filtrar:                   {AEROLINEA}")
+    #print(f"-a                   aerolinea a filtrar:                   {AEROLINEA}")
     print(f"-m                   estrategia de muestreo:                {SAMPLING}")
     print(f"                     atributos seleccionados:               {ATRIBUTOS}")
 
@@ -113,7 +113,7 @@ def crear_path_salida():
         except Exception as e:
             print('No se ha podido eliminar algun archivo de la carpeta de salida')
 
-
+'''
 def display_topics(H, W, feature_names, documents, no_top_words, no_top_documents, og):
     for topic_idx, topic in enumerate(H):
         print("Topic %d:" % (topic_idx))
@@ -127,33 +127,208 @@ def display_topics(H, W, feature_names, documents, no_top_words, no_top_document
     #    print(howMany);
         for doc_index in top_doc_indices:
             print("* " + og[doc_index])
-            
-def generate_cluster_names(H, W, feature_names, documents, no_top_words, no_top_documents, og):
-    cluster_names = []
-    for topic_idx, topic in enumerate(H):
-        top_words = [feature_names[i] for i in topic.argsort()[:-no_top_words - 1:-1]]
-        cluster_name = " ".join(top_words)
-        cluster_names.append(cluster_name)
-    return cluster_names
+'''         
 
 # LLAMADA POR TERMINAL: python clustering.py nombreDeCSV numTopics
 def main():
+    stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
+              'we', 'he', 'my', "you've", 'having', 'in', 'both', 'for', 'themselves', 'are', 'them', 'other',
+              'and', 'an', 'during', 'their', 'can', 'yourself', 'she', 'until', 'so', 'these', 'ours', 'above',
+              'what', 'while', 'have', 're', 'more', 'only', "needn't", 'when', 'just', 'that', 'were', "don't",
+              'very', 'should', 'any', 'y', 'isn', 'who', 'a', 'they', 'to', 'too', "should've", 'has', 'before',
+              'into', 'yours', "it's", 'do', 'against', 'on', 'now', 'her', 've', 'd', 'by', 'am', 'from',
+              'about', 'further', "that'll", "you'd", 'you', 'as', 'how', 'been', 'the', 'or', 'doing', 'such',
+              'his', 'himself', 'ourselves', 'was', 'through', 'out', 'below', 'own', 'myself', 'theirs',
+              'me', 'why', 'once', 'him', 'than', 'be', 'most', "you'll", 'same', 'some', 'with', 'few', 'it',
+              'at', 'after', 'its', 'which', 'there', 'our', 'this', 'hers', 'being', 'did', 'of', 'had', 'under',
+              'over', 'again', 'where', 'those', 'then', "you're", 'i', 'because', 'does', 'all', 'flight', 'plane',
+              'singapore',
+              'airlines', 'airline', 'turkish']
+
     print("Ejecución principal iniciando")
     crear_path_salida()
-
-    ml_dataset = pd.read_csv(INPUT_PATH)
+    #Cargar datos de entrada 
+    ml_dataset = pd.read_csv(INPUT_PATH, header=0)
+    '''
     if ATRIBUTOS == "TODOS":
         atr = ml_dataset.columns
     else:
         atr = ATRIBUTOS
-
-    ml_dataset = ml_dataset[atr]
+    '''
+    #ml_dataset = ml_dataset[atr]
 
     # Filtros seleccionados
-    ml_dataset = ml_dataset[ml_dataset['airline'] == AEROLINEA]
-    ml_dataset = ml_dataset[ml_dataset['airline_sentiment'] == SENTIMIENTO]
+    #ml_dataset = ml_dataset[ml_dataset['airline'] == AEROLINEA]
+
+    #ml_dataset = ml_dataset[ml_dataset['Sentiment'] == SENTIMIENTO]
+    #ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
+    ml_dataset = ml_dataset[ml_dataset[TARGET_COL] == SENTIMIENTO]
+    ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
+    copia = ml_dataset
+    print("Cuantos Documentos van a analizarse: ", len(ml_dataset))
+    
 
 
+# Trabajamos con los textos de las reviews
+    #documentos = ml_dataset["Reviews_Simp"].toList()
+    documentos = ml_dataset['Reviews_Simp'].tolist()
+
+    # Nos aseguramos de que está todo en minusculas
+    for i in range(0, len(documentos)):
+        documentos[i] = documentos[i].lower()
+
+    ### PRUEBA 
+    documentos = [d.split() for d in documentos]
+
+    # Quitar palabras que son solo números
+    documentos = [[token for token in doc if not token.isnumeric()] for doc in documentos]
+    
+    # Quitar palabras que pertenecen al stopWords
+    documentos = [[token for token in doc if not token in stop_words] for doc in documentos]
+
+    # Quitar palabras de un caracter
+    documentos = [[token for token in doc if len(token) > 1] for doc in documentos]
+
+
+    bigrama = Phrases(documentos, min_count=20)
+    for ind in range(len(documentos)):
+        for token in bigrama[documentos[ind]]:
+            if '_' in token:
+                documentos[ind].append(token)
+
+    # Crear diccionario
+    dictionary = Dictionary(documentos)
+    
+    # Filtrar palabras que aparezcan menos de X veces, o más del 5% de los documentos
+    # Sentimiento: 0 -> 244 docs
+    #              1 -> 93 docs
+    #              2 -> 462 docs
+    if SENTIMIENTO==0:
+        dictionary.filter_extremes(no_below=5, no_above=0.2)
+    elif SENTIMIENTO==1:
+        dictionary.filter_extremes(no_below=5, no_above=0.2)
+    elif SENTIMIENTO==2: 
+        dictionary.filter_extremes(no_below=20, no_above=0.05)
+    
+    corpus = [dictionary.doc2bow(doc) for doc in documentos]
+
+    temp = dictionary[0] 
+    id2word = dictionary.id2token
+
+    ## PARAMETROS LDA ##
+    chunksize = 1000
+    passes = 10
+    iterations = 500
+    eval_every = None
+    alpha = 'auto' 
+    eta = 'auto' 
+    random_state = 1000
+
+    if len(copia) < 100: 
+        min = 3
+        max = 7
+
+    elif len(copia) < 300:
+        min = 6
+        max = 10
+    
+    else:
+        min = 8
+        max = 12
+
+
+#############################################################
+#                                                           #
+#############################################################
+    for i in range(min, max):
+        num_topics = i
+
+        modelo = LdaModel(
+        corpus=corpus,
+        id2word=id2word,
+        chunksize=chunksize,
+        alpha=alpha,
+        eta=eta,
+        iterations=iterations,
+        num_topics=num_topics,
+        passes=passes,
+        eval_every= eval_every,
+        random_state = random_state
+        )
+
+        conf_modelo = {'n_topics': num_topics,
+                        'chunksize': chunksize,
+                        'passes':passes,
+                        'iterations':iterations,
+                        'alpha':alpha
+                        }
+        
+        top_topics = modelo.top_topics(corpus)
+
+        media_coherencia = sum([t[1] for t in top_topics]) / num_topics
+        print('La coherencia media para ', num_topics,' es:'' %.4f.' % media_coherencia)
+
+    # Mostrar tópicos
+    
+    print(len(top_topics))
+    for i in range(0,int(num_topics)):
+        print("_____________________________________________")
+        print(top_topics[i])
+
+
+  #  print("Asumiendo que cada documento solo entra en un tópico, cantidades de documentos por tópico:")
+    
+    # Calcular número de documentos por tópico
+'''
+    arrayTop = []
+    i = 0
+    lis = [0] * len(top_topics)
+    
+    while i != len(corpus):
+        j = 0
+        maxi = -1
+        base = -1
+        
+        valores = modelo.get_document_topics(corpus[i], minimum_probability=None, minimum_phi_value=None, per_word_topics=False)
+        for val in valores:
+            if val[1] > maxi:
+                maxi = val[1]
+                base = j
+                        
+            j = j + 1
+        arrayTop.append(nombreTop[base])
+        lis[base] = lis[base] + 1
+        i = i + 1
+        
+    # Mostrarlo
+
+    print(lis)
+
+'''
+
+
+
+if __name__ == '__main__':
+    try:
+        # options: registra los argumentos del usuario
+        # remainder: registra los campos adicionales introducidos -> entrenar_knn.py esto_es_remainder
+        options, remainder = getopt.getopt(argv[1:], 'h:i:o:t:s:m', ['help', 'input', 'output', 'target', 'sentimiento='])
+        
+    except getopt.GetoptError as err:
+        # Error al parsear las opciones del comando
+        print("ERROR: ", err)
+        exit(1)
+
+    print(options)
+
+    cargar_opciones(options)
+
+    mostrar_opciones()
+
+    main()
+
+
+'''
 if __name__ == '__main__':
 
     stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
@@ -192,21 +367,12 @@ if __name__ == '__main__':
     #ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
 
     # FUTUROS FILTRADOS DE DATOS AQUÍ
-    '''
+    
     # Solo tener en cuenta las valoraciones con sentimiento concreto
-    ml_dataset = ml_dataset[ml_dataset["NOMBRECOLUMNA"] == sentimiento]]  ## CONSULTAR CON SENTIMENTANALYSIS
-    '''
+    #ml_dataset = ml_dataset[ml_dataset["NOMBRECOLUMNA"] == sentimiento]]  ## CONSULTAR CON SENTIMENTANALYSIS
+    
     # Filtrar las reseñas según el sentimiento
-    '''
-    if sentimiento == 2:
-        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 2]
-    elif sentimiento == 0:
-        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 0]
-    elif sentimiento == 1:
-        ml_dataset = ml_dataset[ml_dataset['Sentiment'] == 1]
-    else:
-        raise ValueError("Sentimiento debe ser 2 = 'positivas', 0 = 'negativas' o 1 = 'neutras'.")
-    '''
+
     ml_dataset = ml_dataset[ml_dataset['Sentiment'] == sentimiento]
     copia = ml_dataset
     print("Cuantos Documentos van a analizarse: ", len(ml_dataset))
@@ -257,76 +423,13 @@ if __name__ == '__main__':
  
 
     #######################################################################
-    '''
-    # Por cada review, creamos una lista con las palabras de la review
-    documentosAux = []
-    for docuAct in documentos:
-        documentosAux.append(docuAct.split())
 
-    documentos = documentosAux
-    
-    # De cada lista quitamos las palabras que hemos considerado stopwords
-    documentosAux3 = []
-    for docuAct in documentos:
-        filtered_doc = []
-        for token in docuAct:
-            if token not in stop_words:
-                filtered_doc.append(token)
-        documentosAux3.append(filtered_doc)
-
-    documentos = documentosAux3
-
-    # De cada lista quitamos las palabras de longitud 1
-    documentosAux2 = []
-    for docuAct in documentos:
-        token_filtrados = []
-        for token in docuAct:
-            if len(token) > 1:
-                token_filtrados.append(token)
-        documentosAux2.append(token_filtrados)
-
-    documentos = documentosAux2
-
-    # De cada lista quitamos las palabras que son solo números
-    documentosAux4 = []
-    for docuAct in documentos:
-        filtered_doc = []
-        for token in docuAct:
-            if not token.isnumeric():
-                filtered_doc.append(token)
-        documentosAux4.append(filtered_doc)
-
-    documentos = documentosAux4
-
-
-    '''
     bigrama = Phrases(documentos, min_count=20)
     for ind in range(len(documentos)):
         for token in bigrama[documentos[ind]]:
             if '_' in token:
                 documentos[ind].append(token)
-    '''
-
-    # Creamos un diccionario con los documentos
-    diccionario = Dictionary(documentos) 
-
-    # Filtrar palabras que aparezcan menos de X veces, o más del 5% de los documentos
-    diccionario.filter_extremes(no_below=20, no_above=0.05)
-
-    # Parametros necesarios para crear el modelo
-    documentosAux5 = []
-    for docuAct in documentos:
-        documentosAux5.append(diccionario.doc2bow(docuAct))
-
     
-    corpus = documentosAux5
-    id2word = diccionario.id2token
-    num_topics = numTopicos
-    chunksize = 2000
-    passes = 10
-    iterations = 500
-    #eval_every = 10
-    '''
     #############################################################################3
 
     
@@ -388,3 +491,4 @@ if __name__ == '__main__':
 
     copia["razón negativa"] = np.array(arrayTop).tolist()
     copia.to_csv("output.csv")
+'''
