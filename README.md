@@ -25,7 +25,7 @@ Ander Gorocica
 ```
 #### Ejemplo:
 ```console
-foo@bar:~$  python clustering.py -i sing_prepared.csv
+lsi@lsi:~$  python clustering.py -i sing_prepared.csv
 ```
 
 
