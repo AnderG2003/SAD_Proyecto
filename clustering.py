@@ -52,7 +52,7 @@ def usage():
     print(f"-i, --input         path de los archivos de entrada                 DEFAULT: ./{INPUT_PATH}")
     print(f"-o, --output        path de los archivos de salida                  DEFAULT: ./{OUTPUT_PATH}")
     print(f"-t, --target        nombre objetivo a predecir                      DEFAULT: {TARGET_COL}")
-    print(f"-s, --sentiment     sentimiento a filtrar                           DEFAULT: {SENTIMIENTO}")
+    print(f"-s, --sentiment     sentimiento a filtrar                           DEFAULT: {int(SENTIMIENTO)}")
     #print(f"-a, --airline       filtro de aerolinea                             DEFAULT: {AEROLINEA}")
     print(f"-m                  estrategia de muestreo                          DEFAULT: {SAMPLING}")
     
@@ -72,6 +72,7 @@ def cargar_opciones(options):
             TARGET_COL = str(arg)
         elif opt in ('-s','--sentimiento'):
             SENTIMIENTO = str(arg)
+            int(SENTIMIENTO)
         elif opt in ('-m'):
             SAMPLING = str(arg)
         #elif opt in ('-a','--airline'):
@@ -162,7 +163,7 @@ def main():
 
     #ml_dataset = ml_dataset[ml_dataset['Sentiment'] == SENTIMIENTO]
     #ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
-    ml_dataset = ml_dataset[ml_dataset[TARGET_COL] == SENTIMIENTO]
+    ml_dataset = ml_dataset[ml_dataset[TARGET_COL] == int(SENTIMIENTO)]
     ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
     copia = ml_dataset
     print("Cuantos Documentos van a analizarse: ", len(ml_dataset))
