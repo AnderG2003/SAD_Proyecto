@@ -20,6 +20,7 @@ Ander Gorocica
 (-o -> Carpeta donde se guardan los modelos, debe existir)
 (-i -> archivo a analizar)
 (-m -> la métrica según la cual se juzgará el mejor modelo: fscore / precision /accuracy / recall)
+(-c -> clase cuyos resultados queremos optimizar: none / pos / neg)
 ```
 #### Ejemplo:
 ```console
@@ -34,6 +35,11 @@ foo@bar:~$  python sentiMenu.py -i sing_entero.csv -o ModelosTexto -s smote -t T
 ```console
 foo@bar:~$  python sentiMenu.py -i sing_entero.csv -o ModelosTexto -s smote -t False -m fscore 
 ```
+#### Para texto optimizando resultados positivos:
+```console
+foo@bar:~$  python sentiMenu.py -i sing_entero.csv -o ModelosTexto -s smote -t True -c pos
+```
+
 
 ## Sentiment Analysis
 To-do:
