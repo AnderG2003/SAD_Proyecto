@@ -38,7 +38,7 @@ INPUT_PATH  =   "./datos/archivo.csv"           # Path de los archivos de entrad
 OUTPUT_PATH =   "./modelos"                     # Path de los archivos de salida
 TARGET_COL  =   "Sentiment"                     # Nombre de la columna a clasificar
 SENTIMIENTO =   1                               # Sentimiento a filtrar (0 = Negativo, 1 = Neutro, 2 = Positivo)
-SAMPLING    =   "NO"                            # Metodo de muestreo del dataset (NO, UNDERSAMPLING, OVERSAMPLING)
+#SAMPLING    =   "NO"                            # Metodo de muestreo del dataset (NO, UNDERSAMPLING, OVERSAMPLING)
 ATRIBUTOS   =   ['Reviews_Simp']                # Atributos que seleccionamos del dataset (TODOS o lista)
 #AEROLINEA   =   "Singapore Airlines"           # Aerolinea de la que miraremos los datos
 
@@ -54,12 +54,12 @@ def usage():
     print(f"-t, --target        nombre objetivo a predecir                      DEFAULT: {TARGET_COL}")
     print(f"-s, --sentiment     sentimiento a filtrar                           DEFAULT: {int(SENTIMIENTO)}")
     #print(f"-a, --airline       filtro de aerolinea                             DEFAULT: {AEROLINEA}")
-    print(f"-m                  estrategia de muestreo                          DEFAULT: {SAMPLING}")
+    #print(f"-m                  estrategia de muestreo                          DEFAULT: {SAMPLING}")
     
     exit(1)
 
 def cargar_opciones(options):
-    global INPUT_PATH, OUTPUT_PATH, TARGET_COL, SENTIMIENTO, SAMPLING
+    global INPUT_PATH, OUTPUT_PATH, TARGET_COL, SENTIMIENTO#, SAMPLING
 
     for opt, arg in options:
         if opt in ('-h', '--help'):
@@ -73,8 +73,13 @@ def cargar_opciones(options):
         elif opt in ('-s','--sentimiento'):
             SENTIMIENTO = str(arg)
             int(SENTIMIENTO)
-        elif opt in ('-m'):
-            SAMPLING = str(arg)
+
+        #elif opt == '-m':
+        #    SAMPLING = str(arg)
+        #    if SAMPLING == '':
+        #        print("ERROR: Debe especificar un valor para el muestreo.")
+        #    elif SAMPLING not in ("OVERSAMPLING", "UNDERSAMPLING", "NO"):
+        #        print(f"ERROR: El valor de muestreo {SAMPLING} no es valido. Introduzca OVERSAMPLING', 'UNDERSAMPLING' o 'NO'")
         #elif opt in ('-a','--airline'):
         #    AEROLINEA = str(arg)
 
@@ -85,7 +90,7 @@ def mostrar_opciones():
     print(f"-t                   nombre objetivo a predecir:            {TARGET_COL}")
     print(f"-s                   sentimiento a filtrar:                 {SENTIMIENTO}")
     #print(f"-a                   aerolinea a filtrar:                   {AEROLINEA}")
-    print(f"-m                   estrategia de muestreo:                {SAMPLING}")
+    #print(f"-m                   estrategia de muestreo:                {SAMPLING}")
     print(f"                     atributos seleccionados:               {ATRIBUTOS}")
 
 
