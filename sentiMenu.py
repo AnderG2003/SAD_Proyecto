@@ -17,7 +17,8 @@ from nltk.corpus import stopwords
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from imblearn.over_sampling import ADASYN
+import seaborn as sns
+
 # Metrics libraries
 from sklearn import metrics
 from sklearn import preprocessing
@@ -36,12 +37,20 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from textblob import TextBlob
 
-adasyn = ADASYN()
+# Sampling:
+from imblearn.over_sampling import ADASYN
+from imblearn.over_sampling import SMOTE
+from imblearn.combine import SMOTEENN
+from imblearn.combine import SMOTETomek
+
+adasyn = ADASYN(random_state=42)
+smoteenn = SMOTEENN(random_state=42)
+se = SMOTETomek(random_state=42)
 
 warnings.filterwarnings('ignore')
 
 # Other miscellaneous libraries
-from imblearn.over_sampling import SMOTE
+
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 from scipy.stats import pearsonr
@@ -57,6 +66,7 @@ OUT_FILE = "Modelos"
 TEXTO = "False"
 OVERSAMPLING = 'smote'
 METRICA = "fscore"
+CLASE = "none"
 
 stop_words = ['yourselves', 'between', 'whom', 'itself', 'is', "she's", 'up', 'herself', 'here', 'your', 'each',
               'we', 'he', 'my', "you've", 'having', 'in', 'both', 'for', 'themselves', 'are', 'them', 'other',
@@ -101,17 +111,19 @@ def usage():
     print(f"-o, --output    output dir path for the weights     DEFAULT: {OUT_FILE}")
     print(f"-t, --text      ¿Se usará el texto como feature?  DEFAULT: {TEXTO} ")
     print("      --> Opciones (2): True / False")
-    print(f"-s, --sampling   Método para oversampling  DEFAULT: {OVERSAMPLING} ")
-    print("      --> Opciones (2): smote / adasyn")
+    print(f"-s, --sampling   Método para oversampling/undersampling  DEFAULT: {OVERSAMPLING} ")
+    print("      --> Opciones (2): smote / adasyn / smoteenn / smotetomek")
     print(f"-m, --metric     Métrica para decidir el mejor modelo DEFAULT: ./{METRICA}")
     print("      --> Opciones (4): fscore / accuracy / precision / recall")
+    print(f"-c, --class     Optimizar clase DEFAULT: ./{CLASE}")
+    print("      --> Opciones (4): none / positiva / negativa")
 
     # Salimos del programa
     exit(1)
 
 
 def load_options(options):
-    global INPUT_FILE, OUT_FILE, TEXTO, OVERSAMPLING, METRICA
+    global INPUT_FILE, OUT_FILE, TEXTO, OVERSAMPLING, METRICA, CLASE
 
     for opt, arg in options:
         if opt in ('-i', '--input'):
@@ -124,11 +136,26 @@ def load_options(options):
             TEXTO = str(arg)
         elif opt in ('-m', '--metric'):
             METRICA = str(arg)
+        elif opt in ('-c', '--class'):
+            CLASE = str(arg)
         elif opt in ('-h', '--help'):
             usage()
 
 
 ########################## FUNCIONES #################################
+
+def f1_class_0(y_true, y_pred):
+    # Calcular el F1-score para cada clase (problema multiclase)
+    f1_scores = f1_score(y_true, y_pred, average=None, zero_division=0)
+    # Suponiendo que la clase 0 es la clase que deseas optimizar
+    return f1_scores[0]
+
+
+def f1_class_2(y_true, y_pred):
+    # Calcular el F1-score para cada clase (problema multiclase)
+    f1_scores = f1_score(y_true, y_pred, average=None, zero_division=0)
+    # Suponiendo que la clase 2 es la clase que deseas optimizar
+    return f1_scores[2]
 
 
 def sent(rating):
@@ -187,6 +214,7 @@ def process_review(review):
     lemma_tokens = [lemmatizer.lemmatize(t) for t in stopped_tokens]  # Lematizar
     lemma_tokens = [t for t in lemma_tokens if len(t) > 1]  # Eliminar caracteres individuales
     return lemma_tokens
+
 
 def read_country(city):
     """
@@ -263,6 +291,7 @@ def csv_to_dict(file):
 
 def lemm_words(text):
     return " ".join([lemmatizer.lemmatize(word) for word in text.split()])
+
 
 ############### MAIN #################
 
@@ -355,7 +384,6 @@ def main():
         city_lat_dict = csv_to_dict("city_latitude.csv")
         city_long_dict = csv_to_dict("city_longitude.csv")
 
-
     # Agregar columnas al DataFrame usando apply y lambda
     reviews["Or_country"] = reviews["Origin"].apply(lambda city: g_att_str(city_country_dict, city))
     reviews["Dst_country"] = reviews["Destiny"].apply(lambda city: g_att_str(city_country_dict, city))
@@ -424,7 +452,7 @@ def main():
     if TEXTO == "True":
         # Simplificar texto según función clean_review
         reviews['Reviews_Simp'] = reviews["Rev"].apply(lambda x: clean_review(x))
-        #reviews['Reviews_Tok'] = reviews["Rev"].apply(lambda x: process_review(x))
+        # reviews['Reviews_Tok'] = reviews["Rev"].apply(lambda x: process_review(x))
         print(reviews.head())
 
         # Quitar stop words
@@ -445,8 +473,8 @@ def main():
         reviews["Reviews_Simp"] = reviews["Reviews_Simp"].apply(lambda text: lemm_words(text))
         print(reviews.head())
 
-        #PROCESAMIENTO DE EMOTICONOS -> CONVERTIR A TEXTO
-        #https://www.kaggle.com/code/sudalairajkumar/getting-started-with-text-preprocessing
+        # PROCESAMIENTO DE EMOTICONOS -> CONVERTIR A TEXTO
+        # https://www.kaggle.com/code/sudalairajkumar/getting-started-with-text-preprocessing
 
         # DATOS EXTRAÍDOS:
         reviews['polarity'] = reviews['Reviews_Simp'].map(lambda text: TextBlob(text).sentiment.polarity)
@@ -486,7 +514,7 @@ def main():
     else:
         columns = ["Origin", "Destiny", "Scale", "Verified",
                    "Type of Traveller", "Class", "Scale_bool", "year", "month", "day", "Or_country", "Dst_country",
-                   "Or_lat", "Dst_lat", "Dst_long", "Or_long", "distance_km", "polarity", "review_len", "word_count"]
+                   "Or_lat", "Dst_lat", "Dst_long", "Or_long", "distance_km"]
         # columns = ["Reviews_Simp", "Origin", "Destiny", "Scale", "polarity", "review_len", "word_count", "Verified",
         #           "Type of Traveller", "Class", "Scale_bool"]
         review_features = review_features[columns].reset_index(drop=True)
@@ -506,22 +534,25 @@ def main():
         # review_features["Dst_continent"] = le.fit_transform(review_features["Or_continent"])
         print(review_features.head())
 
-        # Numerical:
-        #numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-        #  "Type of Traveller", "Class", "Scale_bool"]]
+        # Numerical ajustando las correlaciones:
+        numerical_ft = review_features[["Destiny", "Scale", "Verified",
+                                        "Type of Traveller", "Class", "Scale_bool", "year", "Dst_country", "Or_lat",
+                                        "day"]]
 
-        #numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-                                     #   "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
-                                      #  "month", "day", "Or_lat", "Dst_lat", "Or_long", "Dst_long", "distance_km"]]
+        # numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+        #   "Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
+        #  "month", "day", "Or_lat", "Dst_lat", "Or_long", "Dst_long", "distance_km"]]
 
         # LAS MEJORES PARA SVC:
-        #numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
-         #                           "Type of Traveller", "Scale_bool", "Or_country", "Dst_country", "year", "Class", "day",
-         #                        "distance_km", "month"]]
+        # numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified",
+        #                           "Type of Traveller", "Scale_bool", "Or_country", "Dst_country", "year", "Class", "day",
+        #                        "distance_km", "month"]]
 
-        #LAS MEJORES PARA KNN:
-        numerical_ft = review_features[["Origin", "Destiny", "Scale", "Verified","Type of Traveller", "Class", "Scale_bool", "Or_country", "Dst_country", "year",
-    "Or_lat", "Dst_lat", "Or_long", "Dst_long", "month", "day"]]
+        # LAS MEJORES PARA KNN:
+        # numerical_ft = review_features[
+        #    ["Origin", "Destiny", "Scale", "Verified", "Type of Traveller", "Class", "Scale_bool", "Or_country",
+        #     "Dst_country", "year",
+        #     "Or_lat", "Dst_lat", "Or_long", "Dst_long", "month", "day"]]
 
         scaler = StandardScaler()
         num_sc = scaler.fit_transform(numerical_ft)
@@ -543,6 +574,19 @@ def main():
         feature_correlations = [(col, correlations[col]) for col in
                                 sorted(correlations, key=correlations.get, reverse=True)]
 
+        num_sem = pd.concat([numerical_ft, reviews['Sentiment']], axis=1)
+
+        ###### MAPA DE CORRELACIONES #######
+        correlation_matrix = num_sem.corr()
+        # Crear el heatmap
+        plt.figure(figsize=(8, 6))  # Tamaño de la figura
+        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm',
+                    fmt='.2f')  # annot para mostrar valores, cmap para elegir la paleta de colores
+        plt.title('Mapa de Correlación')  # Título del gráfico
+        plt.show()  # Mostrar el gráfico
+
+
+
         # Mostrar la lista de características y sus correlaciones
         print("Características ordenadas por correlación con su valor de correlación:")
         for feature, correlation in feature_correlations:
@@ -560,9 +604,13 @@ def main():
     if OVERSAMPLING == 'smote':
         smote = SMOTE(random_state=42)
         X_resampled, y_resampled = smote.fit_resample(X, y)
-    else:
+    elif OVERSAMPLING == 'adasyn':
         adasyn = ADASYN()
         X_resampled, y_resampled = adasyn.fit_resample(X, y)
+    elif OVERSAMPLING == 'smoteenn':
+        X_resampled, y_resampled = smoteenn.fit_resample(X, y)
+    elif OVERSAMPLING == 'smotetomek':
+        X_resampled, y_resampled = se.fit_resample(X, y)
 
     print(f'Resampled dataset shape {Counter(y_resampled)}')
 
@@ -571,6 +619,25 @@ def main():
     ## Splitting the dataset into Train and Test
     X_train, X_test, y_train, y_test = train_test_split(X_resampled, y_resampled, test_size=0.2, random_state=0)
 
+    # Sin resampling, datos desbalanceados -> optimizar para clase positiva ?
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+
+    # Contar instancias por clase en el conjunto de entrenamiento
+    unique_train, counts_train = np.unique(y_train, return_counts=True)
+    train_counts_dict = dict(zip(unique_train, counts_train))
+
+    # Contar instancias por clase en el conjunto de prueba
+    unique_test, counts_test = np.unique(y_test, return_counts=True)
+    test_counts_dict = dict(zip(unique_test, counts_test))
+
+    # Imprimir resultados
+    print("Instancias en el conjunto de entrenamiento:")
+    for class_label, count in train_counts_dict.items():
+        print(f" - {class_label}: {count}")
+
+    print("\nInstancias en el conjunto de prueba:")
+    for class_label, count in test_counts_dict.items():
+        print(f" - {class_label}: {count}")
     ###################### MODELADO #######################
     # creating the objects
     logreg = LogisticRegression(random_state=0)
@@ -579,8 +646,6 @@ def main():
     svc = SVC()
     nb = MultinomialNB()
     rf = RandomForestClassifier()
-    cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2: 'KNN', 3: 'SVC', 4: 'Naive Bayes', 5: 'Random Forest'}
-    cv_models = [logreg, dt, knn, svc, nb, rf]
 
     # Definir los parámetros a buscar para cada clasificador
     param_grid = [
@@ -598,7 +663,7 @@ def main():
         },
         # Parámetros para KNN
         {
-            'n_neighbors': [3, 5, 7, 10],
+            'n_neighbors': [3, 5, 7, 9],
             'weights': ['uniform', 'distance'],
             'metric': ['euclidean', 'manhattan']
         },
@@ -610,7 +675,8 @@ def main():
         },
         # Parámetros para Naive Bayes
         {
-            'alpha': [0.1, 0.5, 1.0]
+            'alpha': [0.1, 0.5, 0.7, 1.0, 2.0, 5.0],
+            'fit_prior': [True, False]
         },
         # Parámetros para Random Forest
         {
@@ -622,7 +688,14 @@ def main():
     ]
 
     # Crear una lista de los clasificadores y sus correspondientes parámetros
-    cv_models = [logreg, dt, knn, svc, nb, rf]
+    if TEXTO == "True":
+        cv_models = [logreg, dt, knn, svc, nb, rf]
+        cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2: 'KNN', 3: 'SVC', 4: 'Naive Bayes',
+                   5: 'Random Forest'}
+    else:
+        cv_models = [logreg, dt, knn, svc, rf]
+        del param_grid[4]
+        cv_dict = {0: 'Logistic Regression', 1: 'Decision Tree', 2: 'KNN', 3: 'SVC', 4: 'Random Forest'}
 
     # Crear una lista de los clasificadores entrenados con los mejores parámetros
     best_models = []
@@ -637,23 +710,33 @@ def main():
         # cv = cross-validation. Se divide train en 5 trozos; se utilizan 4/5 para train, 1/5 para dev. Se dan
         # 5 vueltas. De esta manera se evita el overfitting.
 
-        #scoring => ¿según qué métrica se decide el mejor modelo? Por defecto: fscore
+        # scoring => ¿según qué métrica se decide el mejor modelo? Por defecto: fscore
 
-        #CLASES GENERALES:
+        # CLASES GENERALES:
         precision_weighted_scorer = make_scorer(precision_score, average='weighted', zero_division=0)
         accuracy_scorer = make_scorer(accuracy_score)
         recall_weighted_scorer = make_scorer(recall_score, average='weighted', zero_division=0)
 
-        if METRICA == "fscore":
-            scorer = make_scorer(f1_score, average='weighted')
-        elif METRICA == "accuracy":
-            scorer = accuracy_scorer
-        elif METRICA == "precision":
-            scorer = precision_weighted_scorer
-        elif METRICA == "recall":
-            scorer = recall_weighted_scorer
+        # CLASE POSITIVA
+        # F1-score para la clase positiva
+        f1_pos_scorer = make_scorer(f1_class_2)
+        # F1-score para la clase NEGATIVA
+        f1_neg_scorer = make_scorer(f1_class_0)
+        if CLASE == "pos":
+            scorer = f1_pos_scorer
+        elif CLASE == "neg":
+            scorer = f1_neg_scorer
+        else:
+            if METRICA == "fscore":
+                scorer = make_scorer(f1_score, average='weighted')
+            elif METRICA == "accuracy":
+                scorer = accuracy_scorer
+            elif METRICA == "precision":
+                scorer = precision_weighted_scorer
+            elif METRICA == "recall":
+                scorer = recall_weighted_scorer
 
-        #CLASES ESPECÍFICAS: POSITIVA, NEUTRA, NEGATIVA:
+        # CLASES ESPECÍFICAS: POSITIVA, NEUTRA, NEGATIVA:
         ### POR HACER!
 
         clf = GridSearchCV(model, params, cv=5, scoring=scorer, verbose=0, n_jobs=-1)
@@ -752,16 +835,14 @@ def main():
                 pickle.dump(best_model, f)
                 print(f"Modelo {model_name} guardado como modelo_{model_name}.sav")
 
-
-
     reviews.to_csv("sing_prepared.csv", index=False)
 
 
 if __name__ == '__main__':
     print('ARGV   :', sys.argv[1:])
     try:
-        options, reminder = getopt.getopt(sys.argv[1:], 'i:o:t:s:m:h',
-                                          ['input=', 'output=', 'help', 'text=', 'oversampling=', 'metric='])
+        options, reminder = getopt.getopt(sys.argv[1:], 'i:o:t:s:m:c:h',
+                                          ['input=', 'output=', 'help', 'text=', 'oversampling=', 'class=', 'metric='])
 
     except getopt.GetoptError as err:
         print('ERROR:', err)
