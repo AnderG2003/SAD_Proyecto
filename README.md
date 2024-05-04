@@ -16,7 +16,7 @@ Ander Gorocica
 #### Opciones:
 ```
 (-t -> ¿Se utiliza el texto para entrenar? True / False)
-(-s -> TÉCNICA DE OVERSAMPLING: smote / adasyn)
+(-s -> TÉCNICA DE OVERSAMPLING: smote / adasyn / smoteenn / smotetomek)
 (-o -> Carpeta donde se guardan los modelos, debe existir)
 (-i -> archivo a analizar)
 (-m -> la métrica según la cual se juzgará el mejor modelo: fscore / precision /accuracy / recall)
