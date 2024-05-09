@@ -2,11 +2,14 @@ import pandas as pd
 from gensim.corpora import Dictionary
 from gensim.models import LdaModel, CoherenceModel
 import matplotlib.pyplot as plt
+# VARIABLES GLOBALES
+SENTIMIENTO = 2 # SENTIMIENTO: 0= negativo, 1 = neutro, 2= positivo
+TIPO_COHERENCIA = 'u_mass' # PUEDE SER TIPO_COHERENCIA 'u_mass' o 'c_v' 
 
 # Cargar los datos desde el archivo CSV
 data = pd.read_csv('sing_prepared.csv', header=0)
 
-data = data[data['Sentiment'] == 0]
+data = data[data['Sentiment'] == SENTIMIENTO]
 
 # Preprocesamiento de tus datos, tokenización, eliminación de stopwords, etc.
 
@@ -41,17 +44,17 @@ text_data = documentos
 coherence_scores = []
 
 # Entrenar varios modelos LDA con diferentes valores de K
-for k in range(2, 12):  # Puedes ajustar el rango según tu preferencia
+for k in range(2, 22):  # Puedes ajustar el rango según tu preferencia
     lda_model = LdaModel(corpus=corpus, id2word=dictionary, num_topics=k, random_state=42)
-    coherence_model = CoherenceModel(model=lda_model, texts=text_data, dictionary=dictionary, coherence='c_v')
+    coherence_model = CoherenceModel(model=lda_model, texts=text_data, dictionary=dictionary, coherence=TIPO_COHERENCIA)
     coherence_score = coherence_model.get_coherence()
     coherence_scores.append(coherence_score)
 
 # Graficar la puntuación de coherencia en función de K
-plt.plot(range(2, 12), coherence_scores)
+plt.plot(range(2, 22), coherence_scores)
 plt.xlabel("Número de Temas (K)")
 plt.ylabel("Puntuación de Coherencia")
 plt.title("Puntuación de Coherencia en función de K")
-plt.xticks(range(2, 12))
+plt.xticks(range(2, 22))
 plt.grid(True)
 plt.show()
