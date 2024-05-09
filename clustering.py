@@ -168,7 +168,11 @@ def main():
 
     #ml_dataset = ml_dataset[ml_dataset['Sentiment'] == SENTIMIENTO]
     #ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
+    
+    
+
     ml_dataset = ml_dataset[ml_dataset[TARGET_COL] == int(SENTIMIENTO)]
+    #ml_dataset = ml_dataset[ml_dataset['Review Date'].apply(lambda x: int(x[:4])) == 2021]
     ml_dataset = ml_dataset[~ml_dataset['Reviews_Simp'].isnull()]
     copia = ml_dataset
     print("Cuantos Documentos van a analizarse: ", len(ml_dataset))
@@ -196,11 +200,21 @@ def main():
     documentos = [[token for token in doc if len(token) > 1] for doc in documentos]
 
 
-    bigrama = Phrases(documentos, min_count=20)
+    bigram_model = Phrases(documentos, min_count=20)
     for ind in range(len(documentos)):
-        for token in bigrama[documentos[ind]]:
+        for token in bigram_model[documentos[ind]]:
             if '_' in token:
                 documentos[ind].append(token)
+
+    # Crear trigramas
+    trigram_model = Phrases(bigram_model[documentos], min_count=20)
+    for ind in range(len(documentos)):
+        trigram_tokens = trigram_model[bigram_model[documentos[ind]]]
+        for token in trigram_tokens:
+            if '_' in token:
+                documentos[ind].append(token)
+    
+    #documentos = [[token for token in doc if '_' not in token] for doc in documentos]
 
     # Crear diccionario
     dictionary = Dictionary(documentos)
@@ -229,24 +243,24 @@ def main():
     alpha = 'auto' 
     eta = 'auto' 
     random_state = 1000
-
+    '''
     if len(copia) < 100: 
         min = 3
         max = 7
 
     elif len(copia) < 300:
-        min = 6
+        min = 1
         max = 10
     
     else:
-        min = 8
+        min = 1
         max = 12
-
+    '''
 
 #############################################################
 #                                                           #
 #############################################################
-    for i in range(min, max):
+    for i in range(3, 10):
         num_topics = i
 
         modelo = LdaModel(
@@ -271,15 +285,18 @@ def main():
         
         top_topics = modelo.top_topics(corpus)
 
+        print(len(top_topics))
+        for i in range(0,int(num_topics)):
+            print("_____________________________________________")
+            print(top_topics[i])
+
         media_coherencia = sum([t[1] for t in top_topics]) / num_topics
         print('La coherencia media para ', num_topics,' es:'' %.4f.' % media_coherencia)
+        print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
 
     # Mostrar tópicos
     
-    print(len(top_topics))
-    for i in range(0,int(num_topics)):
-        print("_____________________________________________")
-        print(top_topics[i])
+   
 
 
   #  print("Asumiendo que cada documento solo entra en un tópico, cantidades de documentos por tópico:")
